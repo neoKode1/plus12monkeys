@@ -19,6 +19,7 @@ const CATEGORY_META: Record<string, { label: string; icon: string }> = {
   "ai-ml": { label: "AI / ML", icon: "🤖" },
   finance: { label: "Finance", icon: "💳" },
   intelligence: { label: "Intelligence", icon: "🔓" },
+  custom: { label: "Custom", icon: "⚙️" },
 };
 
 /* ── Status badge ── */

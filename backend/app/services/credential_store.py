@@ -5,7 +5,6 @@ in-memory. In production this would persist to a database; for now it
 provides the same interface with an in-memory backend.
 """
 
-import base64
 import os
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -91,12 +90,6 @@ def get_credentials(
     return creds
 
 
-def decrypt_value(encrypted_value: str) -> str:
-    """Decrypt a single credential value."""
-    f = _get_fernet()
-    return f.decrypt(encrypted_value.encode()).decode()
-
-
 def get_decrypted_env(
     project_id: str,
     server_id: Optional[str] = None,
@@ -122,16 +115,10 @@ def delete_credentials(project_id: str, server_id: Optional[str] = None) -> bool
     return True
 
 
-def list_projects() -> List[str]:
-    """List project IDs that have stored credentials."""
-    return list(_STORE.keys())
-
-
 def get_credential_summary(project_id: str) -> Dict[str, List[str]]:
-    """Return {server_id: [key_names]} for a project (no values)."""
+    """Return {server_id: [key_names]} for a project (no values returned)."""
     creds = get_credentials(project_id)
     summary: Dict[str, List[str]] = {}
     for c in creds:
         summary.setdefault(c.server_id, []).append(c.key)
     return summary
-

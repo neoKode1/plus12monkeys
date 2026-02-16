@@ -10,7 +10,7 @@ Flow:
 
 import json
 import logging
-from typing import Optional, Tuple
+from typing import Optional
 
 import anthropic
 
@@ -83,8 +83,6 @@ def _build_messages(session: WizardSession) -> list[dict]:
         for m in session.messages
         if m.role in (Role.USER, Role.ASSISTANT)
     ]
-
-
 
 
 def _parse_llm_response(raw: str) -> dict:

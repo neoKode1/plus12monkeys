@@ -20,7 +20,7 @@ export interface ExtractedRequirements {
   additional_notes: string | null;
 }
 
-export interface MCPServer {
+export interface MCPServerSummary {
   name: string;
   command: string;
   args: string[];
@@ -32,7 +32,7 @@ export interface Recommendation {
   framework: string;
   framework_reason: string;
   agents: { role: string; goal: string }[];
-  mcp_servers: MCPServer[];
+  mcp_servers: MCPServerSummary[];
   deployment: string;
   estimated_monthly_cost: string | null;
   summary: string;
@@ -72,7 +72,7 @@ export interface AgentTemplate {
   category: string;
   framework: string;
   agents: { role: string; goal: string }[];
-  mcp_servers: MCPServer[];
+  mcp_servers: MCPServerSummary[];
   tags: string[];
   estimated_cost: string | null;
 }
@@ -107,34 +107,6 @@ export async function confirmAndGenerate(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ project_name: projectName }),
-    }
-  );
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || `API error: ${res.status}`);
-  }
-  return res.json();
-}
-
-export async function listTemplates(): Promise<AgentTemplate[]> {
-  const res = await fetch(`${API_BASE}/api/v1/templates`);
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
-
-export async function generateFromTemplate(
-  templateId: string,
-  projectName: string = "my-agent"
-): Promise<GeneratedPackage> {
-  const res = await fetch(
-    `${API_BASE}/api/v1/templates/${templateId}/generate`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        template_id: templateId,
-        project_name: projectName,
-      }),
     }
   );
   if (!res.ok) {
@@ -203,12 +175,6 @@ export async function fetchMCPServers(
   return res.json();
 }
 
-export async function fetchMCPServerDetail(serverId: string): Promise<MCPServerEntry> {
-  const res = await fetch(`${API_BASE}/api/v1/mcp/servers/${serverId}`);
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
-
 export async function runMCPHealthCheck(
   serverId: string,
   projectId?: string,
@@ -238,9 +204,5 @@ export async function storeMCPCredentials(
   return res.json();
 }
 
-export async function fetchMCPCategories(): Promise<{ categories: string[]; total_servers: number }> {
-  const res = await fetch(`${API_BASE}/api/v1/mcp/categories`);
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
+
 

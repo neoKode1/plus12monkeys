@@ -21,12 +21,6 @@ class NANDAClient:
             resp.raise_for_status()
             return resp.json()
 
-    async def stats(self) -> Dict[str, Any]:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(f"{self.base_url}/stats")
-            resp.raise_for_status()
-            return resp.json()
-
     # ---- agent CRUD ----
 
     async def register_agent(
@@ -98,15 +92,6 @@ class NANDAClient:
 
         async with httpx.AsyncClient() as client:
             resp = await client.get(f"{self.base_url}/search", params=params)
-            resp.raise_for_status()
-            return resp.json()
-
-    # ---- MCP servers ----
-
-    async def list_mcp_servers(self) -> List[Dict[str, Any]]:
-        """GET /mcp_servers"""
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(f"{self.base_url}/mcp_servers")
             resp.raise_for_status()
             return resp.json()
 

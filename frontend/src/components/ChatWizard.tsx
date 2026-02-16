@@ -204,7 +204,7 @@ export default function ChatWizard() {
       {
         role: "assistant",
         content:
-          "Welcome to **My-Agent-Too** — your AI assistant builder.\n\nTell me what you need help with, and I'll set up a custom AI assistant for you. No technical knowledge required.\n\n• \"I need someone to answer my phone and book appointments\"\n• \"I want an assistant to handle customer questions over email\"\n• \"Help me set up a virtual receptionist for my business\"",
+          "Welcome to **My-Agent-Too** — build a custom AI agent in minutes.\n\nTell me what you need, and I'll handle the rest. Here are some ideas:\n\n🔧 \"I'm a plumber — I need something to answer calls and book jobs when I'm on-site\"\n💇 \"I run a salon and need help managing appointments and sending reminders\"\n💻 \"Build me an agent that monitors my GitHub repos and posts summaries to Slack\"\n📋 \"I need a customer service agent that handles email and tracks issues\"",
       },
     ]);
   }, []);
@@ -377,6 +377,7 @@ export default function ChatWizard() {
           setProjectName={setProjectName}
           onGenerate={handleGenerate}
           generating={generating}
+          messages={messages}
         />
       )}
 
@@ -432,16 +433,25 @@ function RecommendationPanel({
   setProjectName,
   onGenerate,
   generating,
+  messages,
 }: {
   rec: Recommendation;
   projectName: string;
   setProjectName: (v: string) => void;
   onGenerate: () => void;
   generating: boolean;
+  messages: DisplayMessage[];
 }) {
-  /* Map technical labels to consumer-friendly labels */
-  const friendlyDeployment =
-    rec.deployment === "cloud"
+  /* Detect if the user is a developer based on their messages */
+  const devTerms = /\b(api|mcp|framework|rag|deploy|webhook|sdk|repo|github|langchain|crewai|langgraph|autogen|docker|kubernetes|endpoint|microservice|llm|vector|embedding)\b/i;
+  const isDeveloper = messages
+    .filter((m) => m.role === "user")
+    .some((m) => devTerms.test(m.content));
+
+  /* Adaptive deployment label */
+  const friendlyDeployment = isDeveloper
+    ? rec.deployment === "cloud" ? "Cloud (hosted)" : rec.deployment === "local" ? "Local" : rec.deployment
+    : rec.deployment === "cloud"
       ? "We'll host it for you in the cloud"
       : rec.deployment === "local"
         ? "Runs on your own computer"
@@ -451,7 +461,8 @@ function RecommendationPanel({
   const connectedServices =
     rec.mcp_servers.length > 0
       ? rec.mcp_servers.map((s) => {
-          /* Pretty-print known server names */
+          if (isDeveloper) return s.name;
+          /* Pretty-print known server names for consumers */
           const friendly: Record<string, string> = {
             twilio: "📞 Phone & SMS",
             "google-calendar": "📅 Google Calendar",
@@ -461,23 +472,36 @@ function RecommendationPanel({
             stripe: "💳 Payments",
             shopify: "🛒 Online Store",
             notion: "📝 Notion",
+            github: "🐙 GitHub",
           };
           return friendly[s.name] || s.name;
         })
-      : ["No extra services needed"];
+      : [isDeveloper ? "None" : "No extra services needed"];
 
   return (
     <div className="border-t px-4 py-4" style={{ borderColor: "#1A1A1A", background: "#111111" }}>
       <div className="max-w-3xl mx-auto space-y-4">
         <div className="flex items-center gap-2">
           <span className="text-lg">✨</span>
-          <h2 className="text-sm font-semibold text-[#34D399]">Your AI Assistant Plan</h2>
+          <h2 className="text-sm font-semibold text-[#34D399]">
+            {isDeveloper ? "Agent Configuration" : "Your AI Assistant Plan"}
+          </h2>
         </div>
         <p className="text-[13px] text-[#B0B0B0] leading-relaxed">{rec.summary}</p>
 
         <div className="grid grid-cols-2 gap-3 text-xs">
+          {/* Framework card — developers only */}
+          {isDeveloper && (
+            <div className="rounded-xl p-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
+              <span className="text-[#666] text-[11px] uppercase tracking-wide">Framework</span>
+              <p className="mt-1 font-medium text-[#E8E8E8] text-[13px]">{rec.framework}</p>
+              <p className="mt-0.5 text-[11px] text-[#888]">{rec.framework_reason}</p>
+            </div>
+          )}
           <div className="rounded-xl p-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
-            <span className="text-[#666] text-[11px] uppercase tracking-wide">What it can do</span>
+            <span className="text-[#666] text-[11px] uppercase tracking-wide">
+              {isDeveloper ? "Agent roles" : "What it can do"}
+            </span>
             <ul className="mt-1 space-y-0.5">
               {capabilities.map((c, i) => (
                 <li key={i} className="font-medium text-[#E8E8E8] text-[13px]">• {c}</li>
@@ -485,15 +509,19 @@ function RecommendationPanel({
             </ul>
           </div>
           <div className="rounded-xl p-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
-            <span className="text-[#666] text-[11px] uppercase tracking-wide">Connected services</span>
+            <span className="text-[#666] text-[11px] uppercase tracking-wide">
+              {isDeveloper ? "MCP servers" : "Connected services"}
+            </span>
             <ul className="mt-1 space-y-0.5">
               {connectedServices.map((s, i) => (
-                <li key={i} className="font-medium text-[#E8E8E8] text-[13px]">{s}</li>
+                <li key={i} className="font-medium text-[#E8E8E8] text-[13px]">{isDeveloper ? s : s}</li>
               ))}
             </ul>
           </div>
           <div className="rounded-xl p-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
-            <span className="text-[#666] text-[11px] uppercase tracking-wide">Hosting</span>
+            <span className="text-[#666] text-[11px] uppercase tracking-wide">
+              {isDeveloper ? "Deployment" : "Hosting"}
+            </span>
             <p className="mt-1 font-medium text-[#E8E8E8] text-[13px]">{friendlyDeployment}</p>
           </div>
           {rec.estimated_monthly_cost && (
@@ -508,7 +536,7 @@ function RecommendationPanel({
           <input
             value={projectName}
             onChange={(e) => setProjectName(e.target.value)}
-            placeholder="Name your assistant"
+            placeholder={isDeveloper ? "Project name" : "Name your assistant"}
             className="rounded-xl px-3 py-2 text-sm text-[#E8E8E8] outline-none transition"
             style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}
             onFocus={(e) => (e.target.style.borderColor = "#6C63FF")}
@@ -522,7 +550,7 @@ function RecommendationPanel({
             onMouseEnter={(e) => (e.currentTarget.style.background = "#7B73FF")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "#6C63FF")}
           >
-            {generating ? "Setting up…" : "✨ Build My Assistant"}
+            {generating ? "Generating…" : isDeveloper ? "🚀 Generate Agent" : "✨ Build My Assistant"}
           </button>
         </div>
       </div>

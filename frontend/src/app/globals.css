@@ -61,6 +61,24 @@ body {
   animation: fadeInUp 0.3s ease-out;
 }
 
+/* Typewriter cursor blink */
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.typewriter-cursor::after {
+  content: "▊";
+  color: var(--accent);
+  animation: cursorBlink 0.8s step-end infinite;
+  margin-left: 1px;
+  font-size: 0.9em;
+}
+
+/* Progress stepper */
+.step-active { color: var(--accent); }
+.step-done { color: var(--success); }
+.step-connector { transition: background 0.5s ease; }
+
 /* Markdown-style content in assistant messages */
 .assistant-content ul {
   list-style: disc;

@@ -47,17 +47,136 @@ const IconEdit = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838.838-2.872a2 2 0 0 1 .506-.855z"/></svg>
 );
 
-/* ── Simple markdown-like formatting ── */
+/* ── Markdown formatting with proper list support ── */
 function formatAssistant(text: string) {
-  // Convert **bold**, numbered lists, bullet lists into basic HTML
-  let html = text
+  const escaped = text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
+    .replace(/>/g, "&gt;");
+
+  const lines = escaped.split("\n");
+  const result: string[] = [];
+  let inUl = false;
+  let inOl = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Bullet list item
+    if (/^[•\-\*]\s+/.test(trimmed)) {
+      if (!inUl) { result.push("<ul>"); inUl = true; }
+      if (inOl) { result.push("</ol>"); inOl = false; }
+      result.push(`<li>${trimmed.replace(/^[•\-\*]\s+/, "")}</li>`);
+      continue;
+    }
+    // Numbered list item
+    if (/^[0-9]+[\.\)]\s+/.test(trimmed)) {
+      if (!inOl) { result.push("<ol>"); inOl = true; }
+      if (inUl) { result.push("</ul>"); inUl = false; }
+      result.push(`<li>${trimmed.replace(/^[0-9]+[\.\)]\s+/, "")}</li>`);
+      continue;
+    }
+    // Close any open lists
+    if (inUl) { result.push("</ul>"); inUl = false; }
+    if (inOl) { result.push("</ol>"); inOl = false; }
+
+    if (trimmed === "") {
+      result.push("<br/>");
+    } else {
+      result.push(`<p>${trimmed}</p>`);
+    }
+  }
+  if (inUl) result.push("</ul>");
+  if (inOl) result.push("</ol>");
+
+  return result
+    .join("")
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\n/g, "<br/>");
-  return html;
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+
+/* ── Typewriter hook ── */
+function useTypewriter(text: string, speed = 18) {
+  const [displayed, setDisplayed] = useState("");
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    setDisplayed("");
+    setDone(false);
+    if (!text) { setDone(true); return; }
+
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setDisplayed(text.slice(0, i));
+      if (i >= text.length) {
+        clearInterval(id);
+        setDone(true);
+      }
+    }, speed);
+    return () => clearInterval(id);
+  }, [text, speed]);
+
+  return { displayed, done };
+}
+
+/* ── Typewriter message wrapper ── */
+function TypewriterMessage({
+  content,
+  onDone,
+}: {
+  content: string;
+  onDone?: () => void;
+}) {
+  const { displayed, done } = useTypewriter(content, 14);
+
+  useEffect(() => {
+    if (done && onDone) onDone();
+  }, [done, onDone]);
+
+  return (
+    <span className={done ? "" : "typewriter-cursor"}>
+      <span dangerouslySetInnerHTML={{ __html: formatAssistant(displayed) }} />
+    </span>
+  );
+}
+
+/* ── Progress Stepper ── */
+const STEPS = [
+  { key: "gathering", label: "Describe", icon: "💬" },
+  { key: "recommending", label: "Analyze", icon: "🔍" },
+  { key: "confirmed", label: "Build", icon: "🛠️" },
+  { key: "complete", label: "Ready", icon: "✅" },
+];
+
+function ProgressStepper({ status }: { status: string }) {
+  const currentIdx = STEPS.findIndex((s) => s.key === status);
+  const idx = currentIdx === -1 ? 0 : currentIdx;
+
+  return (
+    <div className="flex items-center justify-center gap-0 py-3 px-4">
+      {STEPS.map((step, i) => {
+        const isDone = i < idx;
+        const isActive = i === idx;
+        return (
+          <div key={step.key} className="flex items-center">
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-500 ${
+              isDone ? "text-[#34D399]" : isActive ? "text-[#6C63FF] bg-[#6C63FF]/10" : "text-[#555]"
+            }`}>
+              <span>{isDone ? "✓" : step.icon}</span>
+              <span>{step.label}</span>
+            </div>
+            {i < STEPS.length - 1 && (
+              <div
+                className="w-8 h-[2px] mx-1 rounded step-connector"
+                style={{ background: i < idx ? "#34D399" : i === idx ? "#6C63FF" : "#2A2A2A" }}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function ChatWizard() {
@@ -72,6 +191,7 @@ export default function ChatWizard() {
   const [previewFile, setPreviewFile] = useState<GeneratedFile | null>(null);
   const [projectName, setProjectName] = useState("my-agent");
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [typingIdx, setTypingIdx] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -84,7 +204,7 @@ export default function ChatWizard() {
       {
         role: "assistant",
         content:
-          "Welcome to **My-Agent-Too**! Describe the AI agent you'd like to build — what it does, which services it should connect to, and any special requirements.\n\nYou can say things like:\n\n• \"I need a customer service bot that uses Slack and Salesforce\"\n• \"Build me a research agent that searches the web and writes reports\"\n• \"Create a data analysis agent connected to PostgreSQL\"",
+          "Welcome to **My-Agent-Too** — your AI assistant builder.\n\nTell me what you need help with, and I'll set up a custom AI assistant for you. No technical knowledge required.\n\n• \"I need someone to answer my phone and book appointments\"\n• \"I want an assistant to handle customer questions over email\"\n• \"Help me set up a virtual receptionist for my business\"",
       },
     ]);
   }, []);
@@ -107,10 +227,11 @@ export default function ChatWizard() {
       const res: ChatResponse = await sendMessage(text, sessionId);
       if (!sessionId) setSessionId(res.session_id);
       setStatus(res.status);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: res.reply },
-      ]);
+      setMessages((prev) => {
+        const next = [...prev, { role: "assistant" as const, content: res.reply }];
+        setTypingIdx(next.length - 1); // trigger typewriter on new msg
+        return next;
+      });
       if (res.recommendation) {
         setRecommendation(res.recommendation);
       }
@@ -150,36 +271,37 @@ export default function ChatWizard() {
     }
   }, [sessionId, generating, projectName]);
 
-  const statusLabel = status === "gathering" ? "Agent Builder" : status === "recommending" ? "Analyzing" : status === "confirmed" ? "Confirmed" : status === "generating" ? "Generating" : status === "complete" ? "Complete" : "Agent Builder";
-
   return (
     <div className="flex h-screen flex-col" style={{ background: "#0D0D0D", color: "#E8E8E8" }}>
 
       {/* ══════════ Top Header Bar ══════════ */}
-      <header className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "#1A1A1A" }}>
-        {/* Left: close */}
-        <button className="p-1.5 rounded-lg transition hover:bg-white/10 text-[#888]">
-          <IconX />
-        </button>
+      <header className="border-b" style={{ borderColor: "#1A1A1A" }}>
+        <div className="flex items-center justify-between px-5 py-3">
+          {/* Left: close */}
+          <button className="p-1.5 rounded-lg transition hover:bg-white/10 text-[#888]">
+            <IconX />
+          </button>
 
-        {/* Center: mode / status */}
-        <button className="flex items-center gap-1.5 px-3 py-1 rounded-lg transition hover:bg-white/5 text-sm text-[#ccc]">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6C63FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>
-          {statusLabel}
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </button>
+          {/* Center: title */}
+          <div className="flex items-center gap-1.5 px-3 py-1 text-sm text-[#ccc]">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6C63FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></svg>
+            My-Agent-Too
+          </div>
 
-        {/* Right: actions */}
-        <div className="flex items-center gap-1">
-          <a href="/mcp" className="px-2.5 py-1 rounded-lg text-[12px] font-medium text-[#6C63FF] hover:bg-[#6C63FF]/10 transition">
-            MCP Servers
-          </a>
-          {[IconDownload, IconBookmark, IconHistory, IconEdit].map((Icon, i) => (
-            <button key={i} className="p-1.5 rounded-lg transition hover:bg-white/10 text-[#888]">
-              <Icon />
-            </button>
-          ))}
+          {/* Right: actions */}
+          <div className="flex items-center gap-1">
+            <a href="/mcp" className="px-2.5 py-1 rounded-lg text-[12px] font-medium text-[#6C63FF] hover:bg-[#6C63FF]/10 transition">
+              MCP Servers
+            </a>
+            {[IconDownload, IconBookmark, IconHistory, IconEdit].map((Icon, i) => (
+              <button key={i} className="p-1.5 rounded-lg transition hover:bg-white/10 text-[#888]">
+                <Icon />
+              </button>
+            ))}
+          </div>
         </div>
+        {/* Progress stepper */}
+        <ProgressStepper status={status} />
       </header>
 
       {/* ══════════ Messages ══════════ */}
@@ -196,35 +318,40 @@ export default function ChatWizard() {
                   </div>
                 </div>
               ) : (
-                /* ── Assistant flowing text ── */
+                /* ── Assistant flowing text (typewriter for latest) ── */
                 <div className="space-y-2">
-                  <div
-                    className="assistant-content text-[14px] leading-[1.75] text-[#D4D4D4]"
-                    dangerouslySetInnerHTML={{ __html: formatAssistant(m.content) }}
-                  />
-                  {/* Action buttons row */}
-                  <div className="flex items-center gap-1 pt-1">
-                    <button
-                      onClick={() => handleCopy(m.content, i)}
-                      className="p-1.5 rounded-md transition hover:bg-white/10 text-[#555] hover:text-[#aaa]"
-                      title="Copy"
-                    >
-                      {copiedIdx === i ? (
-                        <span className="text-[11px] text-green-400 px-1">Copied</span>
-                      ) : (
-                        <IconCopy />
-                      )}
-                    </button>
-                    <button className="p-1.5 rounded-md transition hover:bg-white/10 text-[#555] hover:text-[#aaa]" title="Download">
-                      <IconDownload />
-                    </button>
-                    <button className="p-1.5 rounded-md transition hover:bg-white/10 text-[#555] hover:text-[#aaa]" title="Good response">
-                      <IconThumbUp />
-                    </button>
-                    <button className="p-1.5 rounded-md transition hover:bg-white/10 text-[#555] hover:text-[#aaa]" title="Bad response">
-                      <IconThumbDown />
-                    </button>
+                  <div className="assistant-content text-[14px] leading-[1.75] text-[#D4D4D4]">
+                    {typingIdx === i ? (
+                      <TypewriterMessage
+                        content={m.content}
+                        onDone={() => setTypingIdx(null)}
+                      />
+                    ) : (
+                      <span dangerouslySetInnerHTML={{ __html: formatAssistant(m.content) }} />
+                    )}
                   </div>
+                  {/* Action buttons row (only show when not typing) */}
+                  {typingIdx !== i && (
+                    <div className="flex items-center gap-1 pt-1">
+                      <button
+                        onClick={() => handleCopy(m.content, i)}
+                        className="p-1.5 rounded-md transition hover:bg-white/10 text-[#555] hover:text-[#aaa]"
+                        title="Copy"
+                      >
+                        {copiedIdx === i ? (
+                          <span className="text-[11px] text-green-400 px-1">Copied</span>
+                        ) : (
+                          <IconCopy />
+                        )}
+                      </button>
+                      <button className="p-1.5 rounded-md transition hover:bg-white/10 text-[#555] hover:text-[#aaa]" title="Good response">
+                        <IconThumbUp />
+                      </button>
+                      <button className="p-1.5 rounded-md transition hover:bg-white/10 text-[#555] hover:text-[#aaa]" title="Bad response">
+                        <IconThumbDown />
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -312,38 +439,76 @@ function RecommendationPanel({
   onGenerate: () => void;
   generating: boolean;
 }) {
+  /* Map technical labels to consumer-friendly labels */
+  const friendlyDeployment =
+    rec.deployment === "cloud"
+      ? "We'll host it for you in the cloud"
+      : rec.deployment === "local"
+        ? "Runs on your own computer"
+        : rec.deployment;
+
+  const capabilities = rec.agents.map((a) => a.goal || a.role);
+  const connectedServices =
+    rec.mcp_servers.length > 0
+      ? rec.mcp_servers.map((s) => {
+          /* Pretty-print known server names */
+          const friendly: Record<string, string> = {
+            twilio: "📞 Phone & SMS",
+            "google-calendar": "📅 Google Calendar",
+            slack: "💬 Slack",
+            gmail: "✉️ Email",
+            salesforce: "📊 Salesforce",
+            stripe: "💳 Payments",
+            shopify: "🛒 Online Store",
+            notion: "📝 Notion",
+          };
+          return friendly[s.name] || s.name;
+        })
+      : ["No extra services needed"];
+
   return (
     <div className="border-t px-4 py-4" style={{ borderColor: "#1A1A1A", background: "#111111" }}>
       <div className="max-w-3xl mx-auto space-y-4">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#34D399]" />
-          <h2 className="text-sm font-semibold text-[#34D399]">Recommendation Ready</h2>
+          <span className="text-lg">✨</span>
+          <h2 className="text-sm font-semibold text-[#34D399]">Your AI Assistant Plan</h2>
         </div>
         <p className="text-[13px] text-[#B0B0B0] leading-relaxed">{rec.summary}</p>
 
         <div className="grid grid-cols-2 gap-3 text-xs">
-          {[
-            { label: "Framework", value: rec.framework },
-            { label: "Deployment", value: rec.deployment },
-            { label: "Agent Roles", value: rec.agents.map((a) => a.role).join(", ") },
-            { label: "MCP Integrations", value: rec.mcp_servers.length > 0 ? rec.mcp_servers.map((s) => s.name).join(", ") : "None selected" },
-          ].map(({ label, value }) => (
-            <div key={label} className="rounded-xl p-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
-              <span className="text-[#666] text-[11px] uppercase tracking-wide">{label}</span>
-              <p className="mt-1 font-medium text-[#E8E8E8] text-[13px]">{value}</p>
+          <div className="rounded-xl p-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
+            <span className="text-[#666] text-[11px] uppercase tracking-wide">What it can do</span>
+            <ul className="mt-1 space-y-0.5">
+              {capabilities.map((c, i) => (
+                <li key={i} className="font-medium text-[#E8E8E8] text-[13px]">• {c}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-xl p-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
+            <span className="text-[#666] text-[11px] uppercase tracking-wide">Connected services</span>
+            <ul className="mt-1 space-y-0.5">
+              {connectedServices.map((s, i) => (
+                <li key={i} className="font-medium text-[#E8E8E8] text-[13px]">{s}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-xl p-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
+            <span className="text-[#666] text-[11px] uppercase tracking-wide">Hosting</span>
+            <p className="mt-1 font-medium text-[#E8E8E8] text-[13px]">{friendlyDeployment}</p>
+          </div>
+          {rec.estimated_monthly_cost && (
+            <div className="rounded-xl p-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
+              <span className="text-[#666] text-[11px] uppercase tracking-wide">Estimated cost</span>
+              <p className="mt-1 font-medium text-[#E8E8E8] text-[13px]">About {rec.estimated_monthly_cost}/month</p>
             </div>
-          ))}
+          )}
         </div>
-
-        {rec.estimated_monthly_cost && (
-          <p className="text-[11px] text-[#555]">Est. cost: {rec.estimated_monthly_cost}</p>
-        )}
 
         <div className="flex items-center gap-3 pt-1">
           <input
             value={projectName}
             onChange={(e) => setProjectName(e.target.value)}
-            placeholder="Project name"
+            placeholder="Name your assistant"
             className="rounded-xl px-3 py-2 text-sm text-[#E8E8E8] outline-none transition"
             style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}
             onFocus={(e) => (e.target.style.borderColor = "#6C63FF")}
@@ -357,7 +522,7 @@ function RecommendationPanel({
             onMouseEnter={(e) => (e.currentTarget.style.background = "#7B73FF")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "#6C63FF")}
           >
-            {generating ? "Generating…" : "🚀 Generate Agent"}
+            {generating ? "Setting up…" : "✨ Build My Assistant"}
           </button>
         </div>
       </div>

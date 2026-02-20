@@ -1,0 +1,28 @@
+# +12 Monkeys — MCP wrapper for {{ repo_name }}
+# Auto-generated dependencies
+
+# MCP SDK
+mcp>=1.0.0
+
+# HTTP client (for fetching / proxying)
+httpx>=0.27.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+{% if detected_framework == "fastapi" %}
+# FastAPI (detected in wrapped repo)
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+{% endif %}
+{% if detected_framework == "langgraph" or detected_framework == "langchain" %}
+# LangChain / LangGraph (detected in wrapped repo)
+langchain>=0.3.0
+langgraph>=0.2.0
+{% endif %}
+{% if detected_framework == "huggingface-transformers" %}
+# Transformers (detected in wrapped repo)
+transformers>=4.40.0
+torch>=2.0.0
+{% endif %}
+

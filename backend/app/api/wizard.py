@@ -18,7 +18,7 @@ from app.models.template import (
     GenerateRequest,
     MCPServerConfig,
 )
-from app.services.code_generator import generate_package
+from app.services.code_generator import generate_mcp_wrapper, generate_package
 from app.services.orchestrator import process_message
 from app.services.session_store import sessions
 from app.services.template_registry import get_template_for_framework
@@ -117,21 +117,30 @@ async def confirm_and_generate(session_id: str, body: Optional[ConfirmRequest] =
         for a in (rec.agents or [])
     ]
 
-    req = GenerateRequest(
-        template_id=template.id,
-        config=body.config,
-        deployment=rec.deployment,
-        project_name=body.project_name,
-        mcp_servers=mcp_servers,
-        agents=agents,
-    )
-
     # Transition state
     session.status = SessionStatus.GENERATING
     sessions.save(session)
 
     try:
-        package = generate_package(req)
+        # --- Repo-to-MCP wrapper path ---
+        if session.requirements.repo_url and session.requirements.repo_analysis:
+            logger.info("Generating MCP wrapper for repo: %s", session.requirements.repo_url)
+            package = generate_mcp_wrapper(
+                repo_analysis=session.requirements.repo_analysis,
+                project_name=body.project_name,
+                deployment=rec.deployment,
+            )
+        else:
+            # --- Standard template-based generation ---
+            req = GenerateRequest(
+                template_id=template.id,
+                config=body.config,
+                deployment=rec.deployment,
+                project_name=body.project_name,
+                mcp_servers=mcp_servers,
+                agents=agents,
+            )
+            package = generate_package(req)
     except Exception as exc:
         logger.exception("Code generation failed: %s", exc)
         session.status = SessionStatus.CONFIRMED  # roll back

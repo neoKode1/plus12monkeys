@@ -59,6 +59,9 @@ class ExtractedRequirements(BaseModel):
     framework_preference: Optional[FrameworkChoice] = None
     deployment_preference: Optional[DeploymentTarget] = None
     additional_notes: Optional[str] = None
+    # Repo-to-MCP/SDK fields
+    repo_url: Optional[str] = None
+    repo_analysis: Optional[Dict[str, Any]] = None
 
 
 class Recommendation(BaseModel):

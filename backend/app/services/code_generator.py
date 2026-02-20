@@ -12,8 +12,9 @@ Supported languages / frameworks:
 """
 
 import logging
+import re
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -374,3 +375,129 @@ def generate_package(req: GenerateRequest) -> GeneratedPackage:
         env_vars=ctx["env_vars"],
     )
 
+
+# ---------------------------------------------------------------------------
+# Repo-to-MCP wrapper generation
+# ---------------------------------------------------------------------------
+
+def _safe_name(name: str) -> str:
+    """Convert a repo name to a Python-safe identifier."""
+    return re.sub(r"[^a-zA-Z0-9]", "_", name).strip("_").lower()
+
+
+def generate_mcp_wrapper(
+    repo_analysis: Dict[str, Any],
+    project_name: Optional[str] = None,
+    deployment: DeploymentTarget = DeploymentTarget.LOCAL,
+) -> GeneratedPackage:
+    """Generate an MCP server package that wraps an external repository.
+
+    Uses repo_analysis (from repo_analyzer) to produce a complete MCP server
+    that clones the target repo and exposes its functionality as MCP tools.
+    """
+    repo_name = repo_analysis.get("name", "repo")
+    repo_url = repo_analysis.get("url", "")
+    owner = repo_analysis.get("owner", "unknown")
+    repo_name_safe = _safe_name(repo_name)
+    pname = project_name or f"{repo_name}-mcp"
+
+    ctx = {
+        "project_name": pname,
+        "repo_name": repo_name,
+        "repo_name_safe": repo_name_safe,
+        "repo_url": repo_url,
+        "repo_description": repo_analysis.get("description", f"MCP wrapper for {owner}/{repo_name}"),
+        "primary_language": repo_analysis.get("primary_language", "python"),
+        "detected_framework": repo_analysis.get("detected_framework", ""),
+        "entry_points": repo_analysis.get("entry_points", []),
+        "tree_summary": repo_analysis.get("tree_summary", []),
+        "languages": repo_analysis.get("languages", []),
+    }
+
+    files: List[GeneratedFile] = []
+
+    # 1. MCP server wrapper
+    try:
+        files.append(GeneratedFile(
+            path="mcp_server.py",
+            content=_render("mcp_wrapper.py.j2", ctx),
+            language="python",
+        ))
+    except Exception as exc:
+        logger.error("Failed to render MCP wrapper: %s", exc)
+
+    # 2. Requirements
+    try:
+        files.append(GeneratedFile(
+            path="requirements.txt",
+            content=_render("mcp_wrapper_requirements.txt.j2", ctx),
+            language="text",
+        ))
+    except Exception as exc:
+        logger.warning("Failed to render wrapper requirements: %s", exc)
+
+    # 3. .env.example
+    env_content = f"""# +12 Monkeys MCP Wrapper — {owner}/{repo_name}
+# Add any API keys the wrapped repo needs below
+
+# Where to clone the repo (defaults to ./{repo_name})
+# REPO_DIR=./{repo_name}
+
+# ANTHROPIC_API_KEY=sk-...
+"""
+    files.append(GeneratedFile(path=".env.example", content=env_content, language="text"))
+
+    # 4. MCP client config
+    mcp_config = {
+        "mcpServers": {
+            pname: {
+                "command": "python",
+                "args": ["mcp_server.py"],
+            }
+        }
+    }
+    import json
+    files.append(GeneratedFile(
+        path="mcp-config.json",
+        content=json.dumps(mcp_config, indent=2),
+        language="json",
+    ))
+
+    # 5. Dockerfile
+    dockerfile = f"""FROM python:3.12-slim
+WORKDIR /app
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["python", "mcp_server.py"]
+"""
+    files.append(GeneratedFile(path="Dockerfile", content=dockerfile, language="dockerfile"))
+
+    # 6. README
+    try:
+        files.append(GeneratedFile(
+            path="README.md",
+            content=_render("mcp_wrapper_readme.md.j2", ctx),
+            language="markdown",
+        ))
+    except Exception as exc:
+        logger.warning("Failed to render wrapper README: %s", exc)
+
+    setup = [
+        "cp .env.example .env",
+        "Fill in any API keys the wrapped repo needs",
+        "pip install -r requirements.txt",
+        "python mcp_server.py",
+    ]
+
+    return GeneratedPackage(
+        project_name=pname,
+        template_id="repo-mcp-wrapper",
+        framework=FrameworkChoice.LANGGRAPH,  # default; wrapper is framework-agnostic
+        deployment=deployment,
+        files=files,
+        summary=f"MCP server wrapper for {owner}/{repo_name} — exposes repo functionality as MCP tools.",
+        setup_instructions=setup,
+        env_vars=["ANTHROPIC_API_KEY"],
+    )

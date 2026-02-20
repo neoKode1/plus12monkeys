@@ -10,6 +10,7 @@ Flow:
 
 import json
 import logging
+from dataclasses import asdict
 from typing import Optional
 
 import anthropic
@@ -25,6 +26,12 @@ from app.models.conversation import (
     WizardSession,
 )
 from app.services.recommender import build_recommendation
+from app.services.repo_analyzer import (
+    analyze_repo,
+    contains_repo_url,
+    format_repo_context,
+    parse_repo_url,
+)
 from app.services.session_store import sessions
 
 logger = logging.getLogger(__name__)
@@ -208,6 +215,31 @@ User: "I run a hair salon and I'm drowning in appointment changes and no-shows. 
 }
 
 ═══════════════════════════════════════════════════════════════
+REPO-TO-MCP / REPO-TO-SDK — When the user pastes a URL
+═══════════════════════════════════════════════════════════════
+
+If the user's message contains a GitHub (HTTPS or SSH) or HuggingFace URL, the \
+system will automatically analyse the repository and inject a \
+"--- REPO ANALYSIS ---" block into your context.  When you see this block:
+
+1. Acknowledge the repo by name and describe what it does (from the README / \
+   description).
+2. Propose what to build: an MCP server wrapper (expose the repo's functionality \
+   as MCP tools), an SDK package, or both.
+3. Tailor the framework choice to the repo's language:
+   - Python repo  → default to LangGraph or CrewAI
+   - TypeScript/JS repo → default to Vercel AI SDK
+   - Rust repo  → default to Rig
+   - Go repo    → default to ADK-Go
+4. Set `use_case` to "repo_mcp_wrapper" or "repo_sdk_wrapper".
+5. Pre-populate `integrations` based on what the repo already uses (databases, \
+   APIs, etc. from the analysis).
+6. You may set is_complete=true after just 1–2 turns if the user clearly wants \
+   an MCP/SDK from the repo and no further clarification is needed.
+7. In your reply, be specific: reference actual files, entry points, and \
+   functions from the analysis.
+
+═══════════════════════════════════════════════════════════════
 OUTPUT FORMAT — Every response must be exactly this JSON
 ═══════════════════════════════════════════════════════════════
 
@@ -260,6 +292,8 @@ def _build_context_summary(session: WizardSession) -> str:
         parts.append(f"Deployment preference: {r.deployment_preference.value}")
     if r.additional_notes:
         parts.append(f"Notes: {r.additional_notes}")
+    if r.repo_url:
+        parts.append(f"Source repo: {r.repo_url}")
 
     if not parts:
         return ""
@@ -311,6 +345,29 @@ async def process_message(
     # Append user message
     session.messages.append(Message(role=Role.USER, content=user_message))
 
+    # --- Detect repo URL and analyze if present ---
+    repo_context = ""
+    if contains_repo_url(user_message):
+        parsed = parse_repo_url(user_message)
+        if parsed:
+            _, owner, repo_name = parsed
+            logger.info("Detected repo URL in message: %s/%s", owner, repo_name)
+            try:
+                analysis = await analyze_repo(user_message)
+                if not analysis.error:
+                    session.requirements.repo_url = analysis.url
+                    session.requirements.repo_analysis = asdict(analysis)
+                    repo_context = format_repo_context(analysis)
+                    logger.info(
+                        "Repo analysis complete: %s/%s | lang=%s | fw=%s",
+                        analysis.owner, analysis.name,
+                        analysis.primary_language, analysis.detected_framework,
+                    )
+                else:
+                    logger.warning("Repo analysis error: %s", analysis.error)
+            except Exception as exc:
+                logger.warning("Failed to analyze repo: %s", exc)
+
     # --- Guard: API key ---
     if not settings.anthropic_api_key:
         reply_text = (
@@ -325,11 +382,11 @@ async def process_message(
             status=session.status,
         )
 
-    # --- Call Claude (with dynamic context snapshot) ---
+    # --- Call Claude (with dynamic context snapshot + repo analysis) ---
     try:
         client = _get_client()
         context_snapshot = _build_context_summary(session)
-        system_with_context = SYSTEM_PROMPT + context_snapshot
+        system_with_context = SYSTEM_PROMPT + context_snapshot + repo_context
         logger.info(
             "Turn %d | session=%s | context_fields=%d",
             len([m for m in session.messages if m.role == Role.USER]),

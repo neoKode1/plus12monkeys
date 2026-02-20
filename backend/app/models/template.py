@@ -93,6 +93,8 @@ class GenerateRequest(BaseModel):
     project_name: str = "my-agent"
     mcp_servers: List[MCPServerConfig] = Field(default_factory=list)
     agents: List[AgentRole] = Field(default_factory=list)
+    # Repo-to-MCP/SDK: populated when wrapping an external repo
+    repo_analysis: Optional[Dict[str, Any]] = None
 
 
 class GeneratedFile(BaseModel):

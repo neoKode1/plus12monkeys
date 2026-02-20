@@ -9,7 +9,7 @@ import {
   Recommendation,
   sendMessage,
 } from "@/lib/api";
-import MonkeyIcon from "@/components/MonkeyIcon";
+
 
 interface DisplayMessage {
   role: "user" | "assistant";
@@ -185,6 +185,7 @@ export default function ChatWizard() {
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
+  const [analyzingRepo, setAnalyzingRepo] = useState(false);
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [status, setStatus] = useState("gathering");
   const [generatedPkg, setGeneratedPkg] = useState<GeneratedPackage | null>(null);
@@ -205,7 +206,7 @@ export default function ChatWizard() {
       {
         role: "assistant",
         content:
-          "Welcome to **+12 Monkeys** — build a custom AI agent in minutes.\n\nTell me what you need, and I'll handle the rest. Here are some ideas:\n\n🔧 \"I'm a plumber — I need something to answer calls and book jobs when I'm on-site\"\n💇 \"I run a salon and need help managing appointments and sending reminders\"\n💻 \"Build me an agent that monitors my GitHub repos and posts summaries to Slack\"\n📋 \"I need a customer service agent that handles email and tracks issues\"",
+          "Start building your MCP server, agent, or SDK package.\n\nDescribe what you're building and I'll generate the full stack — framework, deployment config, and MCP integration included.",
       },
     ]);
   }, []);
@@ -216,6 +217,11 @@ export default function ChatWizard() {
     setTimeout(() => setCopiedIdx(null), 2000);
   }, []);
 
+  /* Detect GitHub/HuggingFace URLs in text */
+  const isRepoUrl = (text: string) =>
+    /https?:\/\/(github\.com|huggingface\.co)\/[^\s]+/.test(text) ||
+    /git@github\.com:[^\s]+/.test(text);
+
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text || loading) return;
@@ -223,6 +229,7 @@ export default function ChatWizard() {
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setLoading(true);
+    if (isRepoUrl(text)) setAnalyzingRepo(true);
 
     try {
       const res: ChatResponse = await sendMessage(text, sessionId);
@@ -243,6 +250,7 @@ export default function ChatWizard() {
       ]);
     } finally {
       setLoading(false);
+      setAnalyzingRepo(false);
     }
   }, [input, loading, sessionId]);
 
@@ -278,11 +286,24 @@ export default function ChatWizard() {
       {/* ══════════ Top Header Bar ══════════ */}
       <header className="border-b" style={{ borderColor: "#1A1A1A" }}>
         <div className="flex items-center justify-between px-5 py-3">
-          {/* Left: brand logo + name */}
-          <div className="flex items-center gap-3">
-            <MonkeyIcon size={36} />
-            <span className="text-base font-semibold tracking-tight text-[#E8E8E8]">
-              <span className="text-[#6C63FF]">+12</span> Monkeys
+          {/* Left: brand logo */}
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/favicon-monkey.png"
+              alt="+12 Monkeys"
+              className="h-9 w-9 brightness-0 invert"
+            />
+            <span
+              className="text-white uppercase"
+              style={{
+                fontSize: "24px",
+                fontFamily: "var(--font-brand), 'Barlow Condensed', sans-serif",
+                fontWeight: 300,
+                letterSpacing: "0.16em",
+                lineHeight: 1,
+              }}
+            >
+              +12 Monkeys
             </span>
           </div>
 
@@ -304,8 +325,8 @@ export default function ChatWizard() {
       </header>
 
       {/* ══════════ Messages ══════════ */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
+      <div className="flex-1 overflow-y-auto flex flex-col justify-center">
+        <div className="max-w-3xl mx-auto px-6 py-6 space-y-6 w-full">
           {messages.map((m, i) => (
             <div key={i} className="msg-enter">
               {m.role === "user" ? (
@@ -359,11 +380,49 @@ export default function ChatWizard() {
           {/* Typing indicator */}
           {loading && (
             <div className="msg-enter flex items-center gap-1 py-2">
-              <span className="typing-dot w-2 h-2 rounded-full bg-[#6C63FF]" />
-              <span className="typing-dot w-2 h-2 rounded-full bg-[#6C63FF]" />
-              <span className="typing-dot w-2 h-2 rounded-full bg-[#6C63FF]" />
+              {analyzingRepo ? (
+                <span className="text-sm text-[#6C63FF] flex items-center gap-2">
+                  <span className="typing-dot w-2 h-2 rounded-full bg-[#6C63FF]" />
+                  🔍 Analyzing repository…
+                </span>
+              ) : (
+                <>
+                  <span className="typing-dot w-2 h-2 rounded-full bg-[#6C63FF]" />
+                  <span className="typing-dot w-2 h-2 rounded-full bg-[#6C63FF]" />
+                  <span className="typing-dot w-2 h-2 rounded-full bg-[#6C63FF]" />
+                </>
+              )}
             </div>
           )}
+          {/* ══════════ Input Box (inside message flow) ══════════ */}
+          <div className="pt-4">
+            <form
+              onSubmit={(e) => { e.preventDefault(); handleSend(); }}
+              className="flex items-center gap-2 rounded-2xl px-4 py-2"
+              style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}
+            >
+              <button type="button" className="p-1.5 rounded-lg text-[#555] hover:text-[#aaa] transition hover:bg-white/5">
+                <IconAttach />
+              </button>
+              <input
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask anything"
+                className="flex-1 bg-transparent text-[14px] text-[#E8E8E8] placeholder-[#555] outline-none py-2"
+                disabled={loading || status === "complete"}
+              />
+              <button
+                type="submit"
+                disabled={loading || !input.trim() || status === "complete"}
+                className="p-2 rounded-full transition disabled:opacity-30"
+                style={{ background: input.trim() ? "#6C63FF" : "#333" }}
+              >
+                <IconSend />
+              </button>
+            </form>
+          </div>
+
           <div ref={bottomRef} />
         </div>
       </div>
@@ -388,37 +447,6 @@ export default function ChatWizard() {
           onSelectFile={setPreviewFile}
         />
       )}
-
-      {/* ══════════ Bottom Input ══════════ */}
-      <div className="px-4 pb-5 pt-2">
-        <div className="max-w-3xl mx-auto">
-          <form
-            onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-            className="flex items-center gap-2 rounded-2xl px-4 py-2"
-            style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}
-          >
-            <button type="button" className="p-1.5 rounded-lg text-[#555] hover:text-[#aaa] transition hover:bg-white/5">
-              <IconAttach />
-            </button>
-            <input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask anything"
-              className="flex-1 bg-transparent text-[14px] text-[#E8E8E8] placeholder-[#555] outline-none py-2"
-              disabled={loading || status === "complete"}
-            />
-            <button
-              type="submit"
-              disabled={loading || !input.trim() || status === "complete"}
-              className="p-2 rounded-full transition disabled:opacity-30"
-              style={{ background: input.trim() ? "#6C63FF" : "#333" }}
-            >
-              <IconSend />
-            </button>
-          </form>
-        </div>
-      </div>
     </div>
   );
 }

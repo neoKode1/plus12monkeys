@@ -662,6 +662,8 @@ def _extract_recommendation(
                 session.requirements.deployment_preference = DeploymentTarget(tool_input["deployment_preference"])
             except ValueError:
                 pass
+        if tool_input.get("agents"):
+            session.requirements.custom_agents = tool_input["agents"]
 
         return Recommendation(
             framework=FrameworkChoice(data["framework"]),

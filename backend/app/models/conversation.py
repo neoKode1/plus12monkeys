@@ -59,6 +59,9 @@ class ExtractedRequirements(BaseModel):
     framework_preference: Optional[FrameworkChoice] = None
     deployment_preference: Optional[DeploymentTarget] = None
     additional_notes: Optional[str] = None
+    # Custom agent roles extracted from the user's natural-language request.
+    # Each entry is a dict with at least {"role": str, "goal": str}.
+    custom_agents: List[Dict[str, Any]] = Field(default_factory=list)
     # Repo-to-MCP/SDK fields
     repo_url: Optional[str] = None
     repo_analysis: Optional[Dict[str, Any]] = None

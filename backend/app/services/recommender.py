@@ -124,6 +124,17 @@ _USECASE_FRAMEWORK: Dict[str, FrameworkChoice] = {
     "multi-agent": FrameworkChoice.AUTOGEN,
     "collaboration": FrameworkChoice.AUTOGEN,
     "automation": FrameworkChoice.LANGGRAPH,
+    # Content creation / media / video production
+    "content_creation": FrameworkChoice.CREWAI,
+    "content creation": FrameworkChoice.CREWAI,
+    "content": FrameworkChoice.CREWAI,
+    "video production": FrameworkChoice.CREWAI,
+    "video": FrameworkChoice.CREWAI,
+    "film": FrameworkChoice.CREWAI,
+    "media": FrameworkChoice.CREWAI,
+    "production pipeline": FrameworkChoice.CREWAI,
+    "creative": FrameworkChoice.CREWAI,
+    "storyboard": FrameworkChoice.CREWAI,
     # TypeScript / Vercel AI SDK targets
     "typescript": FrameworkChoice.VERCEL_AI,
     "nextjs": FrameworkChoice.VERCEL_AI,
@@ -209,46 +220,61 @@ def pick_deployment(reqs: ExtractedRequirements) -> DeploymentTarget:
     return DeploymentTarget.CLOUD  # cloud-first default
 
 
+def _default_agents(framework: FrameworkChoice) -> List[Dict[str, Any]]:
+    """Return sensible default agent roles for a given framework."""
+    if framework == FrameworkChoice.CREWAI:
+        return [
+            {"role": "triage", "goal": "Classify and route incoming requests"},
+            {"role": "specialist", "goal": "Handle domain-specific queries"},
+            {"role": "escalation", "goal": "Escalate complex issues to humans"},
+        ]
+    elif framework == FrameworkChoice.AUTOGEN:
+        return [
+            {"role": "coordinator", "goal": "Manage group conversation flow"},
+            {"role": "worker_1", "goal": "Execute primary tasks"},
+            {"role": "critic", "goal": "Review and validate outputs"},
+        ]
+    elif framework == FrameworkChoice.VERCEL_AI:
+        return [
+            {"role": "planner", "goal": "Break down tasks into actionable steps"},
+            {"role": "executor", "goal": "Execute each step and return results"},
+        ]
+    elif framework == FrameworkChoice.RIG:
+        return [
+            {"role": "planner", "goal": "Decompose tasks into async pipeline stages"},
+            {"role": "executor", "goal": "Execute each stage with zero-copy efficiency"},
+        ]
+    elif framework == FrameworkChoice.ADK_GO:
+        return [
+            {"role": "planner", "goal": "Divide work into concurrent goroutine tasks"},
+            {"role": "executor", "goal": "Execute tasks in parallel and merge results"},
+        ]
+    else:  # langgraph / semantic-kernel
+        return [
+            {"role": "planner", "goal": "Break down tasks into steps"},
+            {"role": "executor", "goal": "Execute each step"},
+        ]
+
+
 def build_recommendation(reqs: ExtractedRequirements) -> Recommendation:
     """Produce a full Recommendation from extracted requirements."""
     framework = pick_framework(reqs)
     deployment = pick_deployment(reqs)
     mcp_servers = resolve_integrations(reqs.integrations)
 
-    # Build default agent roles based on framework
-    agents: List[Dict[str, Any]] = []
-    if framework == FrameworkChoice.CREWAI:
+    # Use custom agents from the user's request when provided;
+    # fall back to framework-specific defaults otherwise.
+    if reqs.custom_agents:
         agents = [
-            {"role": "triage", "goal": "Classify and route incoming requests"},
-            {"role": "specialist", "goal": "Handle domain-specific queries"},
-            {"role": "escalation", "goal": "Escalate complex issues to humans"},
+            {
+                "role": a.get("role", "agent"),
+                "goal": a.get("goal", ""),
+                **({"backstory": a["backstory"]} if a.get("backstory") else {}),
+            }
+            for a in reqs.custom_agents
         ]
-    elif framework == FrameworkChoice.AUTOGEN:
-        agents = [
-            {"role": "coordinator", "goal": "Manage group conversation flow"},
-            {"role": "worker_1", "goal": "Execute primary tasks"},
-            {"role": "critic", "goal": "Review and validate outputs"},
-        ]
-    elif framework == FrameworkChoice.VERCEL_AI:
-        agents = [
-            {"role": "planner", "goal": "Break down tasks into actionable steps"},
-            {"role": "executor", "goal": "Execute each step and return results"},
-        ]
-    elif framework == FrameworkChoice.RIG:
-        agents = [
-            {"role": "planner", "goal": "Decompose tasks into async pipeline stages"},
-            {"role": "executor", "goal": "Execute each stage with zero-copy efficiency"},
-        ]
-    elif framework == FrameworkChoice.ADK_GO:
-        agents = [
-            {"role": "planner", "goal": "Divide work into concurrent goroutine tasks"},
-            {"role": "executor", "goal": "Execute tasks in parallel and merge results"},
-        ]
-    else:  # langgraph / semantic-kernel
-        agents = [
-            {"role": "planner", "goal": "Break down tasks into steps"},
-            {"role": "executor", "goal": "Execute each step"},
-        ]
+    else:
+        agents = _default_agents(framework)
 
     return Recommendation(
         framework=framework,

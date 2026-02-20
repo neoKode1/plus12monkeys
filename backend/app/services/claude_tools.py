@@ -145,6 +145,24 @@ TOOLS: List[Dict[str, Any]] = [
                     "enum": ["cloud", "local", "export"],
                     "description": "User's preferred deployment target",
                 },
+                "agents": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "role": {"type": "string", "description": "Agent role name (snake_case, e.g. 'script_analyst')"},
+                            "goal": {"type": "string", "description": "What this agent does"},
+                            "backstory": {"type": "string", "description": "Optional backstory / persona for the agent"},
+                        },
+                        "required": ["role", "goal"],
+                    },
+                    "description": (
+                        "Custom agent roles extracted from the user's request. "
+                        "Each agent needs a role (snake_case identifier) and a goal. "
+                        "If the user described specific agents, pass them here — "
+                        "otherwise omit this field to use sensible defaults."
+                    ),
+                },
             },
             "required": ["use_case", "description", "integrations"],
         },
@@ -285,6 +303,9 @@ async def _exec_get_framework_recommendation(inp: Dict[str, Any]) -> str:
         except ValueError:
             pass
 
+    # Normalise custom agents from tool input (if provided)
+    custom_agents = inp.get("agents") or []
+
     reqs = ExtractedRequirements(
         use_case=inp.get("use_case"),
         description=inp.get("description"),
@@ -294,6 +315,7 @@ async def _exec_get_framework_recommendation(inp: Dict[str, Any]) -> str:
         compliance=inp.get("compliance", []),
         framework_preference=fw_pref,
         deployment_preference=deploy_pref,
+        custom_agents=custom_agents,
     )
     rec = build_recommendation(reqs)
     return json.dumps({

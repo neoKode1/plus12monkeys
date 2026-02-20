@@ -95,6 +95,43 @@ class NANDAClient:
             resp.raise_for_status()
             return resp.json()
 
+    # ---- builds archive ----
+
+    async def log_build(self, build_data: Dict[str, Any]) -> Dict[str, Any]:
+        """POST /builds — store a generated package in the archive."""
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"{self.base_url}/builds",
+                json=build_data,
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+    async def list_builds(
+        self,
+        q: Optional[str] = None,
+        framework: Optional[str] = None,
+        limit: int = 50,
+        skip: int = 0,
+    ) -> Dict[str, Any]:
+        """GET /builds — list stored builds with optional search/filter."""
+        params: Dict[str, Any] = {"limit": limit, "skip": skip}
+        if q:
+            params["q"] = q
+        if framework:
+            params["framework"] = framework
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{self.base_url}/builds", params=params)
+            resp.raise_for_status()
+            return resp.json()
+
+    async def get_build(self, build_id: str) -> Dict[str, Any]:
+        """GET /builds/<build_id> — get a single build with full file contents."""
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{self.base_url}/builds/{build_id}")
+            resp.raise_for_status()
+            return resp.json()
+
 
 # Module-level singleton for convenience
 nanda = NANDAClient()

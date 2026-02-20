@@ -17,6 +17,13 @@ class TemplateCategory(str, Enum):
     DATA_ANALYSIS = "data-analysis"
     CODE_GENERATION = "code-generation"
     MULTI_AGENT = "multi-agent"
+    SALES_MARKETING = "sales-marketing"
+    CONTENT_CREATION = "content-creation"
+    E_COMMERCE = "e-commerce"
+    OPERATIONS = "operations"
+    HEALTHCARE = "healthcare"
+    REAL_ESTATE = "real-estate"
+    EDUCATION = "education"
     CUSTOM = "custom"
 
 

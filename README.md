@@ -18,7 +18,7 @@
 
 ✨ **Conversational Configuration** - No code required, just chat
 🔌 **MCP-Native** - Built on Model Context Protocol (Linux Foundation standard)
-🎨 **5+ Agent Templates** - Customer service, research, data analysis, code gen, multi-agent teams
+🎨 **12 Agent Templates** - Customer service, research, data analysis, code gen, multi-agent teams, sales & lead gen, content creation, e-commerce, operations, healthcare, real estate, education
 🚀 **Three Deployment Options** - LOCAL (docker compose), CLOUD (Railway/Render), EXPORT (self-host)
 🔧 **Multi-Framework Support** - LangGraph, CrewAI, AutoGen, Semantic Kernel
 📦 **Production-Ready Output** - 7 files: agent.py, Dockerfile, docker-compose.yml, requirements.txt, .env.example, mcp-config.json, README.md
@@ -208,7 +208,7 @@ User Input → Conversational Wizard → Template Registry → Code Generator
    - Deployment target selection
 
 3. **Template Registry** (`backend/app/services/template_registry.py`)
-   - 5 built-in templates (customer-service, research, data-analysis, code-generation, multi-agent-team)
+   - 12 built-in templates (customer-service, research, data-analysis, code-generation, multi-agent-team, sales-lead-gen, content-repurposer, ecommerce-analyzer, operations-sop, healthcare-practice, real-estate-marketing, education-builder)
    - In-memory storage
    - Template metadata and configuration
 
@@ -342,6 +342,48 @@ railway up
 - **Agents:** Manager, Executor, Critic, Planner
 - **Deployment:** CLOUD (coordination overhead)
 
+### 6. Sales & Lead Generation Agent (LangGraph)
+- **Use Case:** Lead prospecting, personalized outreach, CRM pipeline tracking
+- **MCP Servers:** web-search
+- **Agents:** Prospector, Outreach Writer, Pipeline Tracker
+- **Deployment:** CLOUD or LOCAL
+
+### 7. Content Repurposer Agent (CrewAI)
+- **Use Case:** Transform podcasts/blogs/videos into multi-platform social content
+- **MCP Servers:** web-search
+- **Agents:** Ingester, Adapter, Scheduler
+- **Deployment:** CLOUD or LOCAL
+
+### 8. E-commerce Review Analyzer (LangGraph)
+- **Use Case:** Sentiment analysis, review scraping, competitive SWOT reports
+- **MCP Servers:** web-search
+- **Agents:** Scraper, Analyst, Reporter
+- **Deployment:** LOCAL or CLOUD
+
+### 9. Operations & SOP Generator (LangGraph)
+- **Use Case:** Auto-generate SOPs, track expenses, optimize subscriptions
+- **MCP Servers:** filesystem
+- **Agents:** Observer, Optimizer, Documenter
+- **Deployment:** LOCAL
+
+### 10. Healthcare Practice Manager (CrewAI)
+- **Use Case:** HIPAA-compliant scheduling, session notes, billing
+- **MCP Servers:** Custom
+- **Agents:** Scheduler, Note Taker, Billing Assistant
+- **Deployment:** LOCAL (HIPAA compliance)
+
+### 11. Real Estate Marketing Agent (CrewAI)
+- **Use Case:** Listing marketing kits, social posts, virtual tour scripts
+- **MCP Servers:** web-search
+- **Agents:** Listing Analyst, Content Creator, Campaign Builder
+- **Deployment:** CLOUD or LOCAL
+
+### 12. Education Content Builder (LangGraph)
+- **Use Case:** Interactive lessons, quizzes, curriculum design, progress tracking
+- **MCP Servers:** filesystem
+- **Agents:** Curriculum Designer, Content Generator, Assessment Builder
+- **Deployment:** LOCAL or CLOUD
+
 ---
 
 ## 🌍 Real-World Example
@@ -416,7 +458,7 @@ docker compose up --build
 **Phase:** ✅ Foundation Complete
 **Implemented:**
 - ✅ Conversational wizard with chat UI
-- ✅ Template registry with 5 built-in templates
+- ✅ Template registry with 12 built-in templates
 - ✅ Jinja2-based code generation pipeline
 - ✅ 7-file package generation (agent.py, Dockerfile, etc.)
 - ✅ Copy-to-clipboard UI with visual feedback

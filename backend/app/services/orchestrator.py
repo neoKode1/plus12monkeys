@@ -14,7 +14,7 @@ Features: Tool Use, Prompt Caching, Extended Thinking (architecture decisions).
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 import anthropic
 
@@ -34,6 +34,32 @@ from app.services.claude_tools import TOOLS, execute_tool
 from app.services.session_store import sessions
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Shared constants
+# ---------------------------------------------------------------------------
+MAX_TOOL_ROUNDS = 5
+THINKING_BUDGET_TOKENS = 8000
+MAX_TOKENS_THINKING = 16_000
+MAX_TOKENS_DEFAULT = 2048
+
+# Tool names (must match the tool definitions in claude_tools.py)
+TOOL_SEARCH_MCP = "search_mcp_servers"
+TOOL_MCP_DETAILS = "get_mcp_server_details"
+TOOL_SEARCH_TEMPLATES = "search_templates"
+TOOL_ANALYZE_REPO = "analyze_repository"
+TOOL_RECOMMEND = "get_framework_recommendation"
+
+TOOL_STATUS_LABELS: Dict[str, str] = {
+    TOOL_SEARCH_MCP: "🔍 Searching MCP servers…",
+    TOOL_MCP_DETAILS: "📋 Fetching server details…",
+    TOOL_SEARCH_TEMPLATES: "📑 Searching templates…",
+    TOOL_ANALYZE_REPO: "🔬 Analyzing repository…",
+    TOOL_RECOMMEND: "⚙️ Building recommendation…",
+}
+
+_FALLBACK_REPLY = "I gathered a lot of information. Let me summarize what I found."
+_ERROR_REPLY = "Something went wrong on my end. Please try again."
 
 # ---------------------------------------------------------------------------
 # System prompt — instructs Claude on its role
@@ -300,6 +326,120 @@ def _build_system_prompt(session: WizardSession) -> list[dict]:
     return blocks
 
 
+def _init_session(session_id: Optional[str], user_message: str) -> WizardSession:
+    """Get or create a session and append the user message."""
+    if session_id:
+        session = sessions.get(session_id)
+        if not session:
+            session = sessions.create()
+    else:
+        session = sessions.create()
+    session.messages.append(Message(role=Role.USER, content=user_message))
+    return session
+
+
+def _build_create_kwargs(
+    system_blocks: list[dict],
+    api_messages: list[dict],
+    use_thinking: bool,
+) -> Dict[str, Any]:
+    """Build the kwargs dict shared by both create() and stream() calls."""
+    kwargs: Dict[str, Any] = dict(
+        model=settings.llm_model,
+        max_tokens=MAX_TOKENS_THINKING if use_thinking else MAX_TOKENS_DEFAULT,
+        system=system_blocks,
+        messages=api_messages,
+        tools=TOOLS,
+    )
+    if use_thinking:
+        kwargs["thinking"] = {
+            "type": "enabled",
+            "budget_tokens": THINKING_BUDGET_TOKENS,
+        }
+    return kwargs
+
+
+async def _execute_tool_calls(
+    tool_calls: List[Dict[str, Any]],
+    session: WizardSession,
+) -> tuple[List[Dict[str, Any]], Optional[Recommendation]]:
+    """Execute tool calls, extract side-effects, return (tool_results, recommendation)."""
+    recommendation: Optional[Recommendation] = None
+    tool_results: List[Dict[str, Any]] = []
+    for tc in tool_calls:
+        result_str = await execute_tool(tc["name"], tc["input"])
+        tool_results.append({
+            "type": "tool_result",
+            "tool_use_id": tc["id"],
+            "content": result_str,
+        })
+        if tc["name"] == TOOL_RECOMMEND:
+            recommendation = _extract_recommendation(result_str, tc["input"], session)
+        if tc["name"] == TOOL_ANALYZE_REPO:
+            _extract_repo_analysis(result_str, session, tc["input"])
+    return tool_results, recommendation
+
+
+def _finalize_session(
+    session: WizardSession,
+    reply_text: str,
+    recommendation: Optional[Recommendation],
+) -> None:
+    """Append assistant reply, update status, and persist."""
+    session.messages.append(Message(role=Role.ASSISTANT, content=reply_text))
+    if recommendation:
+        session.status = SessionStatus.RECOMMENDING
+        session.recommendation = recommendation
+    sessions.save(session)
+
+
+def _build_done_data(
+    session: WizardSession,
+    reply_text: str,
+    recommendation: Optional[Recommendation],
+) -> dict:
+    """Build the JSON-serialisable done payload for streaming responses."""
+    done_data: Dict[str, Any] = {
+        "session_id": session.session_id,
+        "reply": reply_text,
+        "status": session.status.value,
+        "requirements": None,
+        "recommendation": None,
+    }
+    if session.requirements:
+        done_data["requirements"] = {
+            "use_case": session.requirements.use_case,
+            "description": session.requirements.description,
+            "integrations": session.requirements.integrations,
+            "capabilities": session.requirements.capabilities,
+            "scale": session.requirements.scale,
+            "compliance": session.requirements.compliance,
+            "framework_preference": (
+                session.requirements.framework_preference.value
+                if session.requirements.framework_preference else None
+            ),
+            "deployment_preference": (
+                session.requirements.deployment_preference.value
+                if session.requirements.deployment_preference else None
+            ),
+        }
+    if recommendation:
+        done_data["recommendation"] = {
+            "framework": recommendation.framework.value,
+            "framework_reason": recommendation.framework_reason,
+            "agents": recommendation.agents,
+            "mcp_servers": recommendation.mcp_servers,
+            "deployment": recommendation.deployment.value,
+            "estimated_monthly_cost": recommendation.estimated_monthly_cost,
+            "summary": recommendation.summary,
+        }
+    return done_data
+
+
+# ---------------------------------------------------------------------------
+# Non-streaming entry point
+# ---------------------------------------------------------------------------
+
 async def process_message(
     session_id: Optional[str], user_message: str
 ) -> ChatResponse:
@@ -308,16 +448,7 @@ async def process_message(
     Claude can call tools (search MCP servers, analyze repos, etc.)
     during the conversation. We loop until Claude returns a final text.
     """
-    # Get or create session
-    if session_id:
-        session = sessions.get(session_id)
-        if not session:
-            session = sessions.create()
-    else:
-        session = sessions.create()
-
-    # Append user message
-    session.messages.append(Message(role=Role.USER, content=user_message))
+    session = _init_session(session_id, user_message)
 
     # --- Guard: API key ---
     if not settings.anthropic_api_key:
@@ -328,9 +459,7 @@ async def process_message(
         session.messages.append(Message(role=Role.ASSISTANT, content=reply_text))
         sessions.save(session)
         return ChatResponse(
-            session_id=session.session_id,
-            reply=reply_text,
-            status=session.status,
+            session_id=session.session_id, reply=reply_text, status=session.status,
         )
 
     # --- Call Claude with tool use loop ---
@@ -344,115 +473,49 @@ async def process_message(
 
         recommendation: Optional[Recommendation] = None
         reply_text = ""
-        max_tool_rounds = 5  # safety limit
-
-        # Enable extended thinking after the first turn (when there's
-        # enough context for deeper architectural reasoning).
         use_thinking = turn_count > 1
 
-        for tool_round in range(max_tool_rounds):
-            create_kwargs: Dict[str, Any] = dict(
-                model=settings.llm_model,
-                max_tokens=16000 if use_thinking else 2048,
-                system=system_blocks,
-                messages=api_messages,
-                tools=TOOLS,
-            )
-            if use_thinking:
-                create_kwargs["thinking"] = {
-                    "type": "enabled",
-                    "budget_tokens": 8000,
-                }
-
+        for tool_round in range(MAX_TOOL_ROUNDS):
+            create_kwargs = _build_create_kwargs(system_blocks, api_messages, use_thinking)
             response = await client.messages.create(**create_kwargs)
 
-            # Collect text blocks and tool_use blocks from response
-            # (skip thinking blocks — they're internal reasoning)
+            # Collect text and tool_use blocks (skip thinking blocks)
             text_parts: List[str] = []
             tool_calls: List[Dict[str, Any]] = []
-
             for block in response.content:
                 if block.type == "text":
                     text_parts.append(block.text)
                 elif block.type == "tool_use":
-                    tool_calls.append({
-                        "id": block.id,
-                        "name": block.name,
-                        "input": block.input,
-                    })
-                # thinking blocks are silently skipped
+                    tool_calls.append({"id": block.id, "name": block.name, "input": block.input})
 
-            # If no tool calls, Claude is done — extract final text
             if not tool_calls:
                 reply_text = "\n".join(text_parts)
                 break
 
-            # Execute tool calls and build tool results
-            logger.info(
-                "Tool round %d: %s",
-                tool_round + 1,
-                [tc["name"] for tc in tool_calls],
-            )
-
-            # Append Claude's response (with tool_use blocks) to messages
+            logger.info("Tool round %d: %s", tool_round + 1, [tc["name"] for tc in tool_calls])
             api_messages.append({"role": "assistant", "content": response.content})
 
-            # Build tool_result messages
-            tool_results = []
-            for tc in tool_calls:
-                result_str = await execute_tool(tc["name"], tc["input"])
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": tc["id"],
-                    "content": result_str,
-                })
-
-                # Extract recommendation if this was the recommendation tool
-                if tc["name"] == "get_framework_recommendation":
-                    recommendation = _extract_recommendation(result_str, tc["input"], session)
-
-                # Extract repo analysis if this was the analyze tool
-                if tc["name"] == "analyze_repository":
-                    _extract_repo_analysis(result_str, session, tc["input"])
-
+            tool_results, rec = await _execute_tool_calls(tool_calls, session)
+            if rec:
+                recommendation = rec
             api_messages.append({"role": "user", "content": tool_results})
         else:
-            # Exhausted tool rounds — use whatever text we have
-            reply_text = reply_text or "I gathered a lot of information. Let me summarize what I found."
+            reply_text = reply_text or _FALLBACK_REPLY
 
     except (anthropic.AuthenticationError, TypeError):
         logger.error("Anthropic API key missing or invalid")
-        reply_text = (
-            "⚠️ The Anthropic API key is invalid. "
-            "Please check your ANTHROPIC_API_KEY in .env."
-        )
+        reply_text = "⚠️ The Anthropic API key is invalid. Please check your ANTHROPIC_API_KEY in .env."
         session.messages.append(Message(role=Role.ASSISTANT, content=reply_text))
         sessions.save(session)
-        return ChatResponse(
-            session_id=session.session_id,
-            reply=reply_text,
-            status=session.status,
-        )
-    except Exception as exc:
+        return ChatResponse(session_id=session.session_id, reply=reply_text, status=session.status)
+    except Exception as exc:  # broad: top-level safety net for the entire LLM loop
         logger.exception("Unexpected error calling LLM: %s", exc)
-        reply_text = "Something went wrong on my end. Please try again."
+        reply_text = _ERROR_REPLY
         session.messages.append(Message(role=Role.ASSISTANT, content=reply_text))
         sessions.save(session)
-        return ChatResponse(
-            session_id=session.session_id,
-            reply=reply_text,
-            status=session.status,
-        )
+        return ChatResponse(session_id=session.session_id, reply=reply_text, status=session.status)
 
-    # Append assistant reply
-    session.messages.append(Message(role=Role.ASSISTANT, content=reply_text))
-
-    # If recommendation was produced, update session
-    if recommendation:
-        session.status = SessionStatus.RECOMMENDING
-        session.recommendation = recommendation
-
-    sessions.save(session)
+    _finalize_session(session, reply_text, recommendation)
 
     return ChatResponse(
         session_id=session.session_id,
@@ -469,7 +532,7 @@ async def process_message(
 
 async def process_message_stream(
     session_id: Optional[str], user_message: str
-):
+) -> AsyncIterator[Dict[str, str]]:
     """Streaming version of process_message.
 
     Yields dicts like:
@@ -477,25 +540,16 @@ async def process_message_stream(
         {"event": "delta",   "data": "partial text"}
         {"event": "done",    "data": <full ChatResponse JSON>}
     """
-    # Get or create session
-    if session_id:
-        session = sessions.get(session_id)
-        if not session:
-            session = sessions.create()
-    else:
-        session = sessions.create()
-
-    session.messages.append(Message(role=Role.USER, content=user_message))
+    session = _init_session(session_id, user_message)
 
     if not settings.anthropic_api_key:
         reply = "⚠️ The Anthropic API key is not configured."
         session.messages.append(Message(role=Role.ASSISTANT, content=reply))
         sessions.save(session)
         yield {"event": "delta", "data": reply}
-        yield {"event": "done", "data": json.dumps({
-            "session_id": session.session_id, "reply": reply,
-            "status": session.status.value, "requirements": None, "recommendation": None,
-        })}
+        yield {"event": "done", "data": json.dumps(
+            _build_done_data(session, reply, None)
+        )}
         return
 
     try:
@@ -507,26 +561,9 @@ async def process_message_stream(
 
         recommendation: Optional[Recommendation] = None
         full_text = ""
-        max_tool_rounds = 5
 
-        _TOOL_STATUS = {
-            "search_mcp_servers": "🔍 Searching MCP servers…",
-            "get_mcp_server_details": "📋 Fetching server details…",
-            "search_templates": "📑 Searching templates…",
-            "analyze_repository": "🔬 Analyzing repository…",
-            "get_framework_recommendation": "⚙️ Building recommendation…",
-        }
-
-        for tool_round in range(max_tool_rounds):
-            create_kwargs: Dict[str, Any] = dict(
-                model=settings.llm_model,
-                max_tokens=16000 if use_thinking else 2048,
-                system=system_blocks,
-                messages=api_messages,
-                tools=TOOLS,
-            )
-            if use_thinking:
-                create_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 8000}
+        for tool_round in range(MAX_TOOL_ROUNDS):
+            create_kwargs = _build_create_kwargs(system_blocks, api_messages, use_thinking)
 
             # Use streaming for the API call
             streamed_text_parts: List[str] = []
@@ -544,7 +581,9 @@ async def process_message_stream(
                             current_tool_name = block.name
                             current_tool_id = block.id
                             current_tool_input = ""
-                            status_msg = _TOOL_STATUS.get(block.name, f"🔧 Using {block.name}…")
+                            status_msg = TOOL_STATUS_LABELS.get(
+                                block.name, f"🔧 Using {block.name}…"
+                            )
                             yield {"event": "status", "data": status_msg}
                     elif event.type == "content_block_delta":
                         delta = event.delta
@@ -565,84 +604,38 @@ async def process_message_stream(
                                 "input": parsed_input,
                             })
                             current_tool_name = ""
-                # Get the accumulated message before exiting async with
                 final_message = await stream.get_final_message()
 
-            # If no tool calls, we're done
             if not tool_calls:
                 full_text = "".join(streamed_text_parts)
                 break
 
-            # Execute tools (non-streaming) and feed results back
+            # Execute tools and feed results back
             api_messages.append({"role": "assistant", "content": final_message.content})
 
-            tool_results = []
-            for tc in tool_calls:
-                result_str = await execute_tool(tc["name"], tc["input"])
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": tc["id"],
-                    "content": result_str,
-                })
-                if tc["name"] == "get_framework_recommendation":
-                    recommendation = _extract_recommendation(result_str, tc["input"], session)
-                if tc["name"] == "analyze_repository":
-                    _extract_repo_analysis(result_str, session, tc["input"])
-
+            tool_results, rec = await _execute_tool_calls(tool_calls, session)
+            if rec:
+                recommendation = rec
             api_messages.append({"role": "user", "content": tool_results})
         else:
-            full_text = full_text or "I gathered a lot of information. Let me summarize what I found."
+            full_text = full_text or _FALLBACK_REPLY
             yield {"event": "delta", "data": full_text}
 
-    except Exception as exc:
+    except Exception as exc:  # broad: top-level safety net for the streaming loop
         logger.exception("Streaming error: %s", exc)
-        full_text = "Something went wrong on my end. Please try again."
+        full_text = _ERROR_REPLY
         session.messages.append(Message(role=Role.ASSISTANT, content=full_text))
         sessions.save(session)
         yield {"event": "delta", "data": full_text}
-        yield {"event": "done", "data": json.dumps({
-            "session_id": session.session_id, "reply": full_text,
-            "status": session.status.value, "requirements": None, "recommendation": None,
-        })}
+        yield {"event": "done", "data": json.dumps(
+            _build_done_data(session, full_text, None)
+        )}
         return
 
-    # Finalize session
-    session.messages.append(Message(role=Role.ASSISTANT, content=full_text))
-    if recommendation:
-        session.status = SessionStatus.RECOMMENDING
-        session.recommendation = recommendation
-    sessions.save(session)
-
-    # Send the final done event with full structured response
-    done_data = {
-        "session_id": session.session_id,
-        "reply": full_text,
-        "status": session.status.value,
-        "requirements": None,
-        "recommendation": None,
-    }
-    if session.requirements:
-        done_data["requirements"] = {
-            "use_case": session.requirements.use_case,
-            "description": session.requirements.description,
-            "integrations": session.requirements.integrations,
-            "capabilities": session.requirements.capabilities,
-            "scale": session.requirements.scale,
-            "compliance": session.requirements.compliance,
-            "framework_preference": session.requirements.framework_preference.value if session.requirements.framework_preference else None,
-            "deployment_preference": session.requirements.deployment_preference.value if session.requirements.deployment_preference else None,
-        }
-    if recommendation:
-        done_data["recommendation"] = {
-            "framework": recommendation.framework.value,
-            "framework_reason": recommendation.framework_reason,
-            "agents": recommendation.agents,
-            "mcp_servers": recommendation.mcp_servers,
-            "deployment": recommendation.deployment.value,
-            "estimated_monthly_cost": recommendation.estimated_monthly_cost,
-            "summary": recommendation.summary,
-        }
-    yield {"event": "done", "data": json.dumps(done_data)}
+    _finalize_session(session, full_text, recommendation)
+    yield {"event": "done", "data": json.dumps(
+        _build_done_data(session, full_text, recommendation)
+    )}
 
 
 # ---------------------------------------------------------------------------
@@ -699,7 +692,7 @@ def _extract_recommendation(
             estimated_monthly_cost=data.get("estimated_monthly_cost"),
             summary=data.get("summary", ""),
         )
-    except Exception as exc:
+    except (json.JSONDecodeError, KeyError, ValueError) as exc:
         logger.warning("Failed to extract recommendation: %s", exc)
         return None
 
@@ -715,5 +708,5 @@ def _extract_repo_analysis(result_str: str, session: WizardSession, tool_input: 
         # Extract intent from the tool input (Claude decides "wrap" vs "integrate")
         if tool_input:
             session.requirements.repo_intent = tool_input.get("intent", "wrap")
-    except Exception as exc:
+    except (json.JSONDecodeError, KeyError, ValueError) as exc:
         logger.warning("Failed to extract repo analysis: %s", exc)

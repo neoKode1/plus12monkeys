@@ -199,7 +199,7 @@ async def execute_tool(name: str, input_data: Dict[str, Any]) -> str:
             return await _exec_get_framework_recommendation(input_data)
         else:
             return json.dumps({"error": f"Unknown tool: {name}"})
-    except Exception as exc:
+    except Exception as exc:  # broad: any tool can fail in varied ways; surface as JSON error
         logger.exception("Tool execution error for %s: %s", name, exc)
         return json.dumps({"error": str(exc)})
 

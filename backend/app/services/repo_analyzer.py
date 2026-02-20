@@ -127,7 +127,7 @@ async def _analyze_github(url: str, owner: str, repo: str) -> RepoAnalysis:
             analysis.stars = meta.get("stargazers_count", 0)
             analysis.default_branch = meta.get("default_branch", "main")
             analysis.topics = meta.get("topics", [])
-        except Exception as exc:
+        except (httpx.HTTPError, KeyError, ValueError) as exc:
             analysis.error = f"Failed to fetch repo metadata: {exc}"
             return analysis
 
@@ -137,7 +137,7 @@ async def _analyze_github(url: str, owner: str, repo: str) -> RepoAnalysis:
             if r.status_code == 200:
                 tree = r.json().get("tree", [])
                 analysis.tree_summary = [t["path"] for t in tree[:50]]
-        except Exception:
+        except (httpx.HTTPError, KeyError, ValueError):
             pass
 
         # 3. Fetch key files (README, deps, config)
@@ -163,7 +163,7 @@ async def _fetch_github_file(
         if r.status_code == 200:
             # Trim to 3000 chars to keep context manageable
             analysis.key_files[fname] = r.text[:3000]
-    except Exception:
+    except httpx.HTTPError:
         pass
 
 
@@ -203,7 +203,7 @@ async def _analyze_huggingface(url: str, owner: str, repo: str) -> RepoAnalysis:
                 else:
                     analysis.error = f"HuggingFace API returned {r.status_code}"
                     return analysis
-        except Exception as exc:
+        except (httpx.HTTPError, KeyError, ValueError) as exc:
             analysis.error = f"Failed to fetch HuggingFace metadata: {exc}"
             return analysis
 
@@ -212,7 +212,7 @@ async def _analyze_huggingface(url: str, owner: str, repo: str) -> RepoAnalysis:
             r = await client.get(f"https://huggingface.co/{owner}/{repo}/raw/main/README.md")
             if r.status_code == 200:
                 analysis.key_files["README.md"] = r.text[:3000]
-        except Exception:
+        except httpx.HTTPError:
             pass
 
         # 3. Fetch requirements.txt if present
@@ -221,7 +221,7 @@ async def _analyze_huggingface(url: str, owner: str, repo: str) -> RepoAnalysis:
                 r = await client.get(f"https://huggingface.co/{owner}/{repo}/raw/main/requirements.txt")
                 if r.status_code == 200:
                     analysis.key_files["requirements.txt"] = r.text[:2000]
-            except Exception:
+            except httpx.HTTPError:
                 pass
 
     _detect_language_and_framework(analysis)

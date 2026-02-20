@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # CORS — comma-separated origins; "*" allows all (dev only)
     cors_origins: str = "*"
 
+    # Sessions
+    session_ttl_minutes: int = 1440  # 24 hours
+    session_max_count: int = 500     # evict oldest when exceeded
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8000

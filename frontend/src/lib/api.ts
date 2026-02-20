@@ -2,6 +2,84 @@
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// ---------------------------------------------------------------------------
+// Typed error & fetch helper
+// ---------------------------------------------------------------------------
+
+/** Structured API error with HTTP status and retry hint. */
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly detail: string,
+    public readonly retryable: boolean = false,
+  ) {
+    super(detail);
+    this.name = "ApiError";
+  }
+}
+
+const DEFAULT_TIMEOUT_MS = 30_000;
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 1_000;
+const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
+
+/**
+ * Thin wrapper around `fetch` that adds:
+ * - Timeout via AbortController
+ * - Automatic retry for transient failures (429 / 5xx / network errors)
+ * - Typed `ApiError` instead of generic `Error`
+ */
+async function apiFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit & { timeout?: number; retries?: number },
+): Promise<Response> {
+  const { timeout = DEFAULT_TIMEOUT_MS, retries = MAX_RETRIES, ...fetchInit } =
+    init ?? {};
+
+  let lastError: ApiError | null = null;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const res = await fetch(input, { ...fetchInit, signal: controller.signal });
+      clearTimeout(timer);
+
+      if (res.ok) return res;
+
+      const body = await res.json().catch(() => ({ detail: res.statusText }));
+      const detail: string =
+        body?.detail || body?.message || `HTTP ${res.status}`;
+      const canRetry = RETRYABLE_STATUSES.has(res.status);
+
+      if (canRetry && attempt < retries) {
+        lastError = new ApiError(res.status, detail, true);
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
+        continue;
+      }
+      throw new ApiError(res.status, detail, canRetry);
+    } catch (err) {
+      clearTimeout(timer);
+      if (err instanceof ApiError) throw err;
+
+      const isAbort =
+        err instanceof DOMException && err.name === "AbortError";
+      const msg = isAbort
+        ? `Request timed out after ${timeout}ms`
+        : String(err);
+
+      if (attempt < retries) {
+        lastError = new ApiError(0, msg, true);
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
+        continue;
+      }
+      throw new ApiError(0, msg, true);
+    }
+  }
+  throw lastError ?? new ApiError(0, "Unexpected retry loop exit", false);
+}
+
 export interface Message {
   role: "user" | "assistant" | "system";
   content: string;
@@ -83,17 +161,11 @@ export async function sendMessage(
   message: string,
   sessionId?: string
 ): Promise<ChatResponse> {
-  const res = await fetch(`${API_BASE}/api/v1/wizard/chat`, {
+  const res = await apiFetch(`${API_BASE}/api/v1/wizard/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      message,
-      session_id: sessionId || null,
-    }),
+    body: JSON.stringify({ message, session_id: sessionId || null }),
   });
-  if (!res.ok) {
-    throw new Error(`API error: ${res.status}`);
-  }
   return res.json();
 }
 
@@ -113,18 +185,17 @@ export async function sendMessageStream(
   sessionId: string | undefined,
   onEvent: (evt: StreamEvent) => void
 ): Promise<ChatResponse> {
-  const res = await fetch(`${API_BASE}/api/v1/wizard/chat/stream`, {
+  // Streaming: no retry (can't replay a partial stream), longer timeout
+  const res = await apiFetch(`${API_BASE}/api/v1/wizard/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, session_id: sessionId || null }),
+    retries: 0,
+    timeout: 120_000,
   });
 
-  if (!res.ok) {
-    throw new Error(`API error: ${res.status}`);
-  }
-
   const reader = res.body?.getReader();
-  if (!reader) throw new Error("No response body");
+  if (!reader) throw new ApiError(0, "No response body", false);
 
   const decoder = new TextDecoder();
   let buffer = "";
@@ -184,7 +255,7 @@ export async function sendMessageStream(
   dispatchEvent();
 
   if (!finalResponse) {
-    throw new Error("Stream ended without a done event");
+    throw new ApiError(0, "Stream ended without a done event", true);
   }
   return finalResponse;
 }
@@ -193,18 +264,15 @@ export async function confirmAndGenerate(
   sessionId: string,
   projectName: string = "my-agent"
 ): Promise<GeneratedPackage> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/api/v1/wizard/sessions/${sessionId}/confirm`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ project_name: projectName }),
+      timeout: 60_000,
     }
   );
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || `API error: ${res.status}`);
-  }
   return res.json();
 }
 
@@ -262,8 +330,7 @@ export async function fetchMCPServers(
   if (category) params.set("category", category);
   if (search) params.set("search", search);
   const qs = params.toString();
-  const res = await fetch(`${API_BASE}/api/v1/mcp/servers${qs ? `?${qs}` : ""}`);
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  const res = await apiFetch(`${API_BASE}/api/v1/mcp/servers${qs ? `?${qs}` : ""}`);
   return res.json();
 }
 
@@ -274,11 +341,10 @@ export async function runMCPHealthCheck(
   const params = new URLSearchParams();
   if (projectId) params.set("project_id", projectId);
   const qs = params.toString();
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/api/v1/mcp/servers/${serverId}/healthcheck${qs ? `?${qs}` : ""}`,
-    { method: "POST" }
+    { method: "POST" },
   );
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
 
@@ -287,14 +353,10 @@ export async function storeMCPCredentials(
   serverId: string,
   credentials: Record<string, string>,
 ): Promise<{ project_id: string; server_id: string; keys_stored: string[] }> {
-  const res = await fetch(`${API_BASE}/api/v1/mcp/credentials`, {
+  const res = await apiFetch(`${API_BASE}/api/v1/mcp/credentials`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ project_id: projectId, server_id: serverId, credentials }),
   });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
-
-
-

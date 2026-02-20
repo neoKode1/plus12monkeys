@@ -17,7 +17,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader, TemplateError, select_autoescape
 
 from app.models.conversation import DeploymentTarget, FrameworkChoice
 from app.models.template import (
@@ -133,7 +133,7 @@ def _generate_agent_code(
     try:
         code = _render(tmpl_name, ctx)
         files.append(GeneratedFile(path=out_path, content=code, language=lang))
-    except Exception as exc:
+    except TemplateError as exc:
         logger.warning("No agent template for %s: %s", tmpl_name, exc)
 
 
@@ -202,76 +202,34 @@ def _generate_docker(
     ))
 
 
+# Deploy-config specs: (output_path, template_name, language)
+_DEPLOY_CONFIGS: List[tuple[str, str, str]] = [
+    ("railway.toml", "railway_toml.j2", "toml"),
+    ("render.yaml", "render_yaml.j2", "yaml"),
+    ("vercel.json", "vercel_json.j2", "json"),
+    ("k8s/deployment.yaml", "k8s_deployment.yaml.j2", "yaml"),
+    ("k8s/service.yaml", "k8s_service.yaml.j2", "yaml"),
+    ("sam/template.yaml", "sam_template.yaml.j2", "yaml"),
+]
+
+
 def _generate_deploy_configs(
     deployment: DeploymentTarget,
     ctx: Dict[str, Any],
     files: List[GeneratedFile],
 ) -> None:
-    """Generate cloud deployment configs when deployment != LOCAL."""
-    if deployment in (DeploymentTarget.CLOUD, DeploymentTarget.EXPORT):
+    """Generate cloud / export deployment configs from the specs table."""
+    if deployment not in (DeploymentTarget.CLOUD, DeploymentTarget.EXPORT):
+        return
+    for out_path, template_name, lang in _DEPLOY_CONFIGS:
         try:
             files.append(GeneratedFile(
-                path="railway.toml",
-                content=_render("railway_toml.j2", ctx),
-                language="toml",
+                path=out_path,
+                content=_render(template_name, ctx),
+                language=lang,
             ))
-        except Exception as exc:
-            logger.warning("Could not render railway.toml: %s", exc)
-        try:
-            files.append(GeneratedFile(
-                path="render.yaml",
-                content=_render("render_yaml.j2", ctx),
-                language="yaml",
-            ))
-        except Exception as exc:
-            logger.warning("Could not render render.yaml: %s", exc)
-        try:
-            files.append(GeneratedFile(
-                path="vercel.json",
-                content=_render("vercel_json.j2", ctx),
-                language="json",
-            ))
-        except Exception as exc:
-            logger.warning("Could not render vercel.json: %s", exc)
-
-
-def _generate_k8s_manifests(
-    deployment: DeploymentTarget,
-    ctx: Dict[str, Any],
-    files: List[GeneratedFile],
-) -> None:
-    """Generate Kubernetes manifests when deployment is CLOUD or EXPORT."""
-    if deployment in (DeploymentTarget.CLOUD, DeploymentTarget.EXPORT):
-        try:
-            files.append(GeneratedFile(
-                path="k8s/deployment.yaml",
-                content=_render("k8s_deployment.yaml.j2", ctx),
-                language="yaml",
-            ))
-            files.append(GeneratedFile(
-                path="k8s/service.yaml",
-                content=_render("k8s_service.yaml.j2", ctx),
-                language="yaml",
-            ))
-        except Exception as exc:
-            logger.warning("Could not render K8s manifests: %s", exc)
-
-
-def _generate_sam_template(
-    deployment: DeploymentTarget,
-    ctx: Dict[str, Any],
-    files: List[GeneratedFile],
-) -> None:
-    """Generate AWS SAM template when deployment is CLOUD or EXPORT."""
-    if deployment in (DeploymentTarget.CLOUD, DeploymentTarget.EXPORT):
-        try:
-            files.append(GeneratedFile(
-                path="sam/template.yaml",
-                content=_render("sam_template.yaml.j2", ctx),
-                language="yaml",
-            ))
-        except Exception as exc:
-            logger.warning("Could not render SAM template: %s", exc)
+        except TemplateError as exc:
+            logger.warning("Could not render %s: %s", out_path, exc)
 
 
 # ---------------------------------------------------------------------------
@@ -322,14 +280,8 @@ def generate_package(req: GenerateRequest) -> GeneratedPackage:
         language="json",
     ))
 
-    # 6. Cloud deployment configs (Railway, Render, Vercel) — when not LOCAL
+    # 6. Cloud deployment configs (Railway, Render, Vercel, K8s, SAM) — when not LOCAL
     _generate_deploy_configs(req.deployment, ctx, files)
-
-    # 7. Kubernetes manifests — when CLOUD or EXPORT
-    _generate_k8s_manifests(req.deployment, ctx, files)
-
-    # 8. AWS SAM template — when CLOUD or EXPORT
-    _generate_sam_template(req.deployment, ctx, files)
 
     # 9. README
     files.append(GeneratedFile(
@@ -430,7 +382,7 @@ def generate_mcp_wrapper(
             content=_render("mcp_wrapper.py.j2", ctx),
             language="python",
         ))
-    except Exception as exc:
+    except TemplateError as exc:
         logger.error("Failed to render MCP wrapper: %s", exc)
 
     # 2. Requirements
@@ -440,7 +392,7 @@ def generate_mcp_wrapper(
             content=_render("mcp_wrapper_requirements.txt.j2", ctx),
             language="text",
         ))
-    except Exception as exc:
+    except TemplateError as exc:
         logger.warning("Failed to render wrapper requirements: %s", exc)
 
     # 3. .env.example
@@ -487,7 +439,7 @@ CMD ["python", "mcp_server.py"]
             content=_render("mcp_wrapper_readme.md.j2", ctx),
             language="markdown",
         ))
-    except Exception as exc:
+    except TemplateError as exc:
         logger.warning("Failed to render wrapper README: %s", exc)
 
     setup = [

@@ -2,6 +2,7 @@
 
 from typing import List, Optional
 
+import httpx
 from fastapi import APIRouter, HTTPException, Query
 
 from app.models.agent import (
@@ -37,7 +38,7 @@ async def create_agent(body: AgentCreateRequest):
             status="success",
             message=f"Agent {body.agent_id} registered",
         )
-    except Exception as exc:
+    except (httpx.HTTPError, KeyError, ValueError) as exc:
         raise HTTPException(status_code=502, detail=f"NANDA error: {exc}") from exc
 
 
@@ -53,7 +54,7 @@ async def list_agents(
         tag_list = [t.strip() for t in tags.split(",")] if tags else None
         results = await nanda.search_agents(q=q, capabilities=caps, tags=tag_list)
         return [AgentResponse(**a) for a in results]
-    except Exception as exc:
+    except (httpx.HTTPError, KeyError, ValueError) as exc:
         raise HTTPException(status_code=502, detail=f"NANDA error: {exc}") from exc
 
 
@@ -67,7 +68,7 @@ async def get_agent(agent_id: str):
         return AgentResponse(**data)
     except HTTPException:
         raise
-    except Exception as exc:
+    except (httpx.HTTPError, KeyError, ValueError) as exc:
         raise HTTPException(status_code=502, detail=f"NANDA error: {exc}") from exc
 
 
@@ -79,7 +80,7 @@ async def update_status(agent_id: str, body: AgentStatusUpdate):
         result = await nanda.update_agent_status(agent_id, payload)
         agent_data = result.get("agent", result)
         return AgentResponse(**agent_data)
-    except Exception as exc:
+    except (httpx.HTTPError, KeyError, ValueError) as exc:
         raise HTTPException(status_code=502, detail=f"NANDA error: {exc}") from exc
 
 
@@ -93,6 +94,6 @@ async def delete_agent(agent_id: str):
         return result
     except HTTPException:
         raise
-    except Exception as exc:
+    except (httpx.HTTPError, KeyError, ValueError) as exc:
         raise HTTPException(status_code=502, detail=f"NANDA error: {exc}") from exc
 

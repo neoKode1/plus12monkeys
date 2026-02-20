@@ -190,7 +190,7 @@ async def confirm_and_generate(session_id: str, body: Optional[ConfirmRequest] =
                 repo_analysis=session.requirements.repo_analysis if has_repo else None,
             )
             package = generate_package(req)
-    except Exception as exc:
+    except Exception as exc:  # broad: wraps template rendering + JSON + I/O in one safety net
         logger.exception("Code generation failed: %s", exc)
         session.status = SessionStatus.CONFIRMED  # roll back
         sessions.save(session)

@@ -1,4 +1,8 @@
-# 🐵 +12 Monkeys
+<p align="center">
+  <img src="frontend/public/12monkey%20logo1.png" alt="+12 Monkeys" width="400" />
+</p>
+
+# +12 Monkeys
 
 **Agent-as-a-Service Platform with MCP Integration**
 

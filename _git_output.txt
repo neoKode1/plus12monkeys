@@ -1,0 +1,22 @@
+=== GIT STATE CHECK ===
+HEAD: 0fdd6e3cff490338b51a88bfe864baf6eededff9
+LOG:
+0fdd6e3 feat: add shutdown handler (W4) + foundational test suite (W1)
+afe2e7f fix: resolve 4 bugs from gap analysis (B1-B4)
+a73850d feat: Claude skills upgrade — Tool Use, Prompt Caching, Extended Thinking, Streaming
+563f2e8 feat: Repo-to-MCP paste GitHub URL to generate MCP server
+c5c0982 Add +12 Monkeys logo to frontend header, MCP page, and favicon
+STATUS:
+M  backend/app/core/config.py
+M  backend/app/main.py
+M  backend/app/services/session_store.py
+M  frontend/package-lock.json
+M  frontend/package.json
+M  frontend/src/components/ChatWizard.tsx
+D  frontend/src/components/MonkeyIcon.tsx
+M  frontend/src/lib/api.ts
+ M nanda-index
+?? _git_helper.py
+?? _git_output.txt
+
+--- Staging changes ---

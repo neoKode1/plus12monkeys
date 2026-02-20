@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     llm_model: str = "claude-sonnet-4-20250514"
 
+    # CORS — comma-separated origins; "*" allows all (dev only)
+    cors_origins: str = "*"
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8000

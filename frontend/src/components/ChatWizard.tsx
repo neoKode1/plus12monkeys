@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import DOMPurify from "isomorphic-dompurify";
+import JSZip from "jszip";
 import {
   ChatResponse,
   confirmAndGenerate,
@@ -92,10 +94,15 @@ function formatAssistant(text: string) {
   if (inUl) result.push("</ul>");
   if (inOl) result.push("</ol>");
 
-  return result
+  const raw = result
     .join("")
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
     .replace(/`([^`]+)`/g, "<code>$1</code>");
+
+  return DOMPurify.sanitize(raw, {
+    ALLOWED_TAGS: ["p", "br", "ul", "ol", "li", "strong", "code"],
+    ALLOWED_ATTR: [],
+  });
 }
 
 /* ── Typewriter hook ── */
@@ -665,15 +672,16 @@ function PackagePreview({
           <p className="text-[11px] text-[#666] mt-0.5">{pkg.summary}</p>
         </div>
         <button
-          onClick={() => {
-            const blob = new Blob(
-              [pkg.files.map((f) => `// === ${f.path} ===\n${f.content}`).join("\n\n")],
-              { type: "text/plain" }
-            );
+          onClick={async () => {
+            const zip = new JSZip();
+            for (const f of pkg.files) {
+              zip.file(f.path, f.content);
+            }
+            const blob = await zip.generateAsync({ type: "blob" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `${pkg.project_name}-bundle.txt`;
+            a.download = `${pkg.project_name}.zip`;
             a.click();
             URL.revokeObjectURL(url);
           }}

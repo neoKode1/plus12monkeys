@@ -130,6 +130,28 @@ export async function sendMessageStream(
   let buffer = "";
   let finalResponse: ChatResponse | null = null;
 
+  // SSE parse state (per-event accumulator)
+  let currentEvent = "delta";
+  let dataChunks: string[] = [];
+
+  function dispatchEvent() {
+    if (dataChunks.length === 0) return;
+    const rawData = dataChunks.join("\n");
+    dataChunks = [];
+    try {
+      const parsed = JSON.parse(rawData);
+      if (currentEvent === "done") {
+        finalResponse = typeof parsed === "string" ? JSON.parse(parsed) : parsed;
+        onEvent({ event: "done", data: typeof parsed === "string" ? parsed : rawData });
+      } else {
+        onEvent({ event: currentEvent as StreamEvent["event"], data: parsed });
+      }
+    } catch {
+      onEvent({ event: currentEvent as StreamEvent["event"], data: rawData });
+    }
+    currentEvent = "delta";
+  }
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -138,27 +160,28 @@ export async function sendMessageStream(
     const lines = buffer.split("\n");
     buffer = lines.pop() || "";
 
-    let currentEvent = "delta";
     for (const line of lines) {
-      if (line.startsWith("event: ")) {
+      if (line === "") {
+        // Blank line = end of event — dispatch accumulated data
+        dispatchEvent();
+      } else if (line.startsWith("event: ")) {
         currentEvent = line.slice(7).trim();
       } else if (line.startsWith("data: ")) {
-        const rawData = line.slice(6);
-        try {
-          const parsed = JSON.parse(rawData);
-          if (currentEvent === "done") {
-            // `done` data is a JSON string containing the ChatResponse
-            finalResponse = typeof parsed === "string" ? JSON.parse(parsed) : parsed;
-            onEvent({ event: "done", data: typeof parsed === "string" ? parsed : rawData });
-          } else {
-            onEvent({ event: currentEvent as StreamEvent["event"], data: parsed });
-          }
-        } catch {
-          onEvent({ event: currentEvent as StreamEvent["event"], data: rawData });
-        }
+        dataChunks.push(line.slice(6));
+      } else if (line.startsWith("data:")) {
+        // "data:" with no space — value is everything after the colon
+        dataChunks.push(line.slice(5));
+      } else if (line.startsWith("id: ") || line.startsWith("id:")) {
+        // Acknowledge but we don't track lastEventId for now
+      } else if (line.startsWith("retry: ") || line.startsWith("retry:")) {
+        // Server-suggested reconnect interval — ignored for now
+      } else if (line.startsWith(":")) {
+        // SSE comment — ignore
       }
     }
   }
+  // Flush any trailing event without a final blank line
+  dispatchEvent();
 
   if (!finalResponse) {
     throw new Error("Stream ended without a done event");

@@ -65,6 +65,9 @@ class ExtractedRequirements(BaseModel):
     # Repo-to-MCP/SDK fields
     repo_url: Optional[str] = None
     repo_analysis: Optional[Dict[str, Any]] = None
+    # "wrap" = build MCP wrapper around the repo;
+    # "integrate" = build an agent designed to plug into this app.
+    repo_intent: Optional[str] = None  # "wrap" | "integrate"
 
 
 class Recommendation(BaseModel):

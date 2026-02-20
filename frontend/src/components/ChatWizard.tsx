@@ -213,7 +213,7 @@ export default function ChatWizard() {
       {
         role: "assistant",
         content:
-          "Start building your MCP server, agent, or SDK package.\n\nDescribe what you're building and I'll generate the full stack — framework, deployment config, and MCP integration included.",
+          "Start building your MCP server, agent, or SDK package.\n\nDescribe what you're building and I'll generate the full stack — framework, deployment config, and MCP integration included.\n\n💡 Have an existing app? Paste a **GitHub** or **HuggingFace** link and I'll tailor the agent to fit your stack.",
       },
     ]);
   }, []);

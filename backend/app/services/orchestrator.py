@@ -108,6 +108,20 @@ WHAT TO GATHER (through conversation, not a form)
 7. DEPLOYMENT — Cloud (hosted), local, or export as code. \
    For non-technical users, default to cloud and just confirm.
 
+8. EXISTING APPLICATION (proactive — ask early!) — \
+   Before diving deep into framework/integration details, ask: \
+   "Do you have an existing app you'd like to plug this agent into? \
+   If so, share a GitHub or HuggingFace link and I'll tailor the build \
+   to fit your stack." \
+   If they share a link, call analyze_repository immediately. Then use \
+   the results to: \
+   - Match the agent's language to the app (Python app → Python agent). \
+   - Suggest integrations that align with the app's existing services \
+     (e.g., if the app uses PostgreSQL, recommend the Postgres MCP). \
+   - Shape agent roles to complement what the app already does. \
+   If they don't have an app (or want a standalone agent), that's fine — \
+   skip this and continue as normal.
+
 ═══════════════════════════════════════════════════════════════
 COMPLETION CRITERIA — When to call get_framework_recommendation
 ═══════════════════════════════════════════════════════════════
@@ -180,15 +194,26 @@ If the user's message contains a GitHub or HuggingFace URL:
 
 1. Call the analyze_repository tool with the URL.
 2. Acknowledge the repo by name and describe what it does.
-3. Propose what to build: an MCP server wrapper, an SDK package, or both.
-4. Tailor the framework choice to the repo's language:
+3. Determine intent — does the user want to:
+   a) WRAP this repo as an MCP server / SDK package?
+   b) BUILD AN AGENT FOR this existing app (integrate into it)?
+   If unclear, ask: "Would you like me to build an MCP wrapper around \
+   this repo, or build an agent designed to integrate INTO this app?"
+4. For WRAPPING (a): Propose an MCP server wrapper / SDK package.
+5. For INTEGRATING INTO (b): Use the repo analysis to shape agent design:
+   - Match the agent language to the app's primary language.
+   - Suggest MCP servers that align with the app's detected services \
+     (e.g., if the app uses postgres → recommend postgres MCP).
+   - Design agent roles that complement the app's existing functionality.
+   - Reference specific files, models, and patterns from the repo.
+6. Tailor the framework choice to the repo's language:
    - Python repo  → default to LangGraph or CrewAI
    - TypeScript/JS repo → default to Vercel AI SDK
    - Rust repo  → default to Rig
    - Go repo    → default to ADK-Go
-5. You may call get_framework_recommendation after just 1–2 turns if the \
+7. You may call get_framework_recommendation after just 1–2 turns if the \
    user clearly wants an MCP/SDK from the repo.
-6. In your reply, be specific: reference actual files, entry points, and \
+8. In your reply, be specific: reference actual files, entry points, and \
    functions from the analysis.
 """
 
@@ -388,7 +413,7 @@ async def process_message(
 
                 # Extract repo analysis if this was the analyze tool
                 if tc["name"] == "analyze_repository":
-                    _extract_repo_analysis(result_str, session)
+                    _extract_repo_analysis(result_str, session, tc["input"])
 
             api_messages.append({"role": "user", "content": tool_results})
         else:
@@ -562,7 +587,7 @@ async def process_message_stream(
                 if tc["name"] == "get_framework_recommendation":
                     recommendation = _extract_recommendation(result_str, tc["input"], session)
                 if tc["name"] == "analyze_repository":
-                    _extract_repo_analysis(result_str, session)
+                    _extract_repo_analysis(result_str, session, tc["input"])
 
             api_messages.append({"role": "user", "content": tool_results})
         else:
@@ -679,13 +704,16 @@ def _extract_recommendation(
         return None
 
 
-def _extract_repo_analysis(result_str: str, session: WizardSession) -> None:
-    """Store repo analysis results in the session."""
+def _extract_repo_analysis(result_str: str, session: WizardSession, tool_input: Optional[Dict[str, Any]] = None) -> None:
+    """Store repo analysis results and repo intent in the session."""
     try:
         data = json.loads(result_str)
         if data.get("error"):
             return
         session.requirements.repo_url = data.get("url", "")
         session.requirements.repo_analysis = data
+        # Extract intent from the tool input (Claude decides "wrap" vs "integrate")
+        if tool_input:
+            session.requirements.repo_intent = tool_input.get("intent", "wrap")
     except Exception as exc:
         logger.warning("Failed to extract repo analysis: %s", exc)

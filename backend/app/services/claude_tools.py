@@ -89,8 +89,8 @@ TOOLS: List[Dict[str, Any]] = [
         "description": (
             "Analyze a GitHub or HuggingFace repository URL. Fetches repo metadata, "
             "detects language/framework, identifies entry points, and reads key files. "
-            "Use this when the user pastes a repo URL and wants to build an MCP server "
-            "or SDK from it."
+            "Use this when the user pastes a repo URL — either to wrap it as an MCP "
+            "server, or to understand an existing app they want to integrate an agent into."
         ),
         "input_schema": {
             "type": "object",
@@ -98,6 +98,16 @@ TOOLS: List[Dict[str, Any]] = [
                 "url": {
                     "type": "string",
                     "description": "GitHub HTTPS/SSH URL or HuggingFace model URL",
+                },
+                "intent": {
+                    "type": "string",
+                    "enum": ["wrap", "integrate"],
+                    "description": (
+                        "Why the user shared this repo. "
+                        "'wrap' = build an MCP server wrapping this repo. "
+                        "'integrate' = build an agent designed to plug into this existing app. "
+                        "Default: 'wrap'."
+                    ),
                 },
             },
             "required": ["url"],

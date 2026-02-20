@@ -56,7 +56,7 @@ def _build_context(
     """Build the Jinja2 rendering context from template + request."""
     agents = req.agents if req.agents else template.agents
     mcp_servers = req.mcp_servers if req.mcp_servers else template.mcp_servers
-    return {
+    ctx = {
         "project_name": req.project_name,
         "framework": template.framework.value,
         "deployment": req.deployment.value,
@@ -68,6 +68,12 @@ def _build_context(
         "config": req.config,
         "env_vars": _collect_env_vars(mcp_servers),
     }
+    # When integrating into an existing app, surface target app info so
+    # templates can reference it (e.g. in comments, README, config).
+    target_app = req.config.get("target_app") if isinstance(req.config, dict) else None
+    if target_app:
+        ctx["target_app"] = target_app
+    return ctx
 
 
 def _collect_env_vars(servers: List[MCPServerConfig]) -> List[str]:

@@ -154,8 +154,11 @@ async def confirm_and_generate(session_id: str, body: Optional[ConfirmRequest] =
     sessions.save(session)
 
     try:
-        # --- Repo-to-MCP wrapper path ---
-        if session.requirements.repo_url and session.requirements.repo_analysis:
+        repo_intent = session.requirements.repo_intent or "wrap"
+        has_repo = bool(session.requirements.repo_url and session.requirements.repo_analysis)
+
+        if has_repo and repo_intent == "wrap":
+            # --- Repo-to-MCP wrapper path ---
             logger.info("Generating MCP wrapper for repo: %s", session.requirements.repo_url)
             package = generate_mcp_wrapper(
                 repo_analysis=session.requirements.repo_analysis,
@@ -164,13 +167,27 @@ async def confirm_and_generate(session_id: str, body: Optional[ConfirmRequest] =
             )
         else:
             # --- Standard template-based generation ---
+            # When the user shared a repo for integration, pass target app
+            # context so templates can reference the existing app's stack.
+            config = dict(body.config)
+            if has_repo and repo_intent == "integrate":
+                ra = session.requirements.repo_analysis or {}
+                config["target_app"] = {
+                    "repo_url": session.requirements.repo_url,
+                    "name": ra.get("name", ""),
+                    "primary_language": ra.get("primary_language", ""),
+                    "detected_framework": ra.get("detected_framework", ""),
+                    "entry_points": ra.get("entry_points", []),
+                    "description": ra.get("description", ""),
+                }
             req = GenerateRequest(
                 template_id=template.id,
-                config=body.config,
+                config=config,
                 deployment=rec.deployment,
                 project_name=body.project_name,
                 mcp_servers=mcp_servers,
                 agents=agents,
+                repo_analysis=session.requirements.repo_analysis if has_repo else None,
             )
             package = generate_package(req)
     except Exception as exc:

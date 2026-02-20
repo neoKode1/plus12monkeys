@@ -21,6 +21,7 @@ from app.models.template import (
     MCPServerConfig,
 )
 from app.services.code_generator import generate_mcp_wrapper, generate_package
+from app.services.nanda_client import nanda
 from app.services.orchestrator import process_message, process_message_stream
 from app.services.session_store import sessions
 from app.services.template_registry import get_template_for_framework
@@ -199,5 +200,44 @@ async def confirm_and_generate(session_id: str, body: Optional[ConfirmRequest] =
     session.status = SessionStatus.COMPLETE
     sessions.save(session)
 
+    # --- Log build to MongoDB for future reference ---
+    try:
+        build_data = {
+            "project_name": package.project_name,
+            "template_id": package.template_id,
+            "framework": package.framework.value if hasattr(package.framework, "value") else str(package.framework),
+            "deployment": package.deployment.value if hasattr(package.deployment, "value") else str(package.deployment),
+            "summary": package.summary,
+            "agents": [a.model_dump() if hasattr(a, "model_dump") else a for a in (rec.agents or [])],
+            "mcp_servers": [s.model_dump() if hasattr(s, "model_dump") else s for s in mcp_servers],
+            "files": [f.model_dump() for f in package.files],
+            "repo_url": session.requirements.repo_url,
+            "repo_intent": session.requirements.repo_intent,
+            "session_id": session_id,
+            "tags": _build_tags(package, session),
+            "created_at": package.created_at.isoformat(),
+        }
+        await nanda.log_build(build_data)
+        logger.info("Build archived: %s (session %s)", package.project_name, session_id)
+    except Exception as exc:
+        # Non-fatal — don't fail the user's download if archiving fails
+        logger.warning("Failed to archive build: %s", exc)
+
     return package
+
+
+def _build_tags(package: GeneratedPackage, session: WizardSession) -> list:
+    """Derive searchable tags from a generated package and its session."""
+    tags: list = []
+    fw = package.framework.value if hasattr(package.framework, "value") else str(package.framework)
+    tags.append(fw)
+    if session.requirements.use_case:
+        tags.append(session.requirements.use_case)
+    if session.requirements.repo_url:
+        tags.append("repo-wrap" if session.requirements.repo_intent == "wrap" else "repo-integrate")
+    for a in (session.recommendation.agents or []) if session.recommendation else []:
+        role = a.get("role") if isinstance(a, dict) else getattr(a, "role", None)
+        if role:
+            tags.append(role)
+    return tags
 

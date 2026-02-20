@@ -20,7 +20,7 @@ const barlowCondensed = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
-  title: "+12 Monkeys — Build AI Agents in Minutes",
+  title: "+12 Monkeys",
   description: "Agent-as-a-Service platform with MCP integration",
   icons: {
     icon: "/favicon-monkey.png",

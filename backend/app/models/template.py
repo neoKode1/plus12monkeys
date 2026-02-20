@@ -24,6 +24,10 @@ class TemplateCategory(str, Enum):
     HEALTHCARE = "healthcare"
     REAL_ESTATE = "real-estate"
     EDUCATION = "education"
+    STEM_EDUCATION = "stem-education"
+    FINANCE = "finance"
+    MILITARY = "military"
+    MEDICAL = "medical"
     CUSTOM = "custom"
 
 

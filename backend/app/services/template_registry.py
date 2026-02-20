@@ -1,6 +1,6 @@
 """In-memory registry of built-in agent templates.
 
-Provides the 12 built-in templates and lookup helpers used by the code generator.
+Provides the 20 built-in templates and lookup helpers used by the code generator.
 """
 
 from typing import Dict, List, Optional
@@ -340,6 +340,231 @@ _register(AgentTemplate(
     ],
     estimated_cost="$25-70/month",
     tags=["education", "learning", "curriculum", "quizzes", "interactive", "edtech"],
+))
+
+# 13. STEM Lab Simulator Agent (LangGraph)
+_register(AgentTemplate(
+    id="stem-lab-simulator",
+    name="STEM Lab Simulator",
+    description="Virtual lab environment — physics, chemistry, and biology experiment simulations with adaptive problem-solving walkthroughs.",
+    category=TemplateCategory.STEM_EDUCATION,
+    framework=FrameworkChoice.LANGGRAPH,
+    agents=[
+        AgentRole(role="experiment_designer", goal="Design virtual experiments with realistic parameters and safety constraints", backstory="PhD-level science educator who builds engaging lab experiences", tools=["design_experiment"]),
+        AgentRole(role="simulation_engine", goal="Run step-by-step simulations and calculate outcomes", backstory="Computational scientist specializing in physics and chemistry models", tools=["run_simulation", "calculate"]),
+        AgentRole(role="tutor", goal="Provide hints, explain results, and adapt difficulty based on student performance", backstory="Adaptive learning specialist who meets students at their level", tools=["assess_understanding", "generate_hint"]),
+    ],
+    mcp_servers=[
+        MCPServerConfig(name="filesystem", command="npx", args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp/stem-lab"], required_env=[], category="tools"),
+    ],
+    required_fields=[
+        TemplateField(name="subject", label="STEM Subject", field_type="select", options=["physics", "chemistry", "biology", "earth-science", "environmental-science"], required=True),
+        TemplateField(name="level", label="Education Level", field_type="select", options=["middle-school", "high-school", "ap-level", "college-intro", "college-advanced"], required=True),
+    ],
+    optional_fields=[
+        TemplateField(name="lab_safety_mode", label="Lab Safety Prompts", field_type="boolean", default=True, description="Include safety reminders and proper procedure guidance"),
+        TemplateField(name="difficulty_adaptation", label="Adaptive Difficulty", field_type="boolean", default=True, description="Automatically adjust problem difficulty based on student responses"),
+        TemplateField(name="max_experiments", label="Max Experiments Per Session", field_type="number", default=5),
+    ],
+    estimated_cost="$20-50/month",
+    tags=["stem", "education", "lab", "simulation", "physics", "chemistry", "biology", "adaptive-learning"],
+))
+
+# 14. STEM Coding Tutor Agent (CrewAI)
+_register(AgentTemplate(
+    id="stem-coding-tutor",
+    name="STEM Coding Tutor",
+    description="Interactive coding instructor — real-time feedback, auto-grading, project scaffolding for CS, robotics, and data science.",
+    category=TemplateCategory.STEM_EDUCATION,
+    framework=FrameworkChoice.CREWAI,
+    agents=[
+        AgentRole(role="instructor", goal="Deliver structured coding lessons with clear explanations and examples", backstory="Senior CS educator with 15 years teaching experience", tools=["generate_lesson", "create_example"]),
+        AgentRole(role="code_reviewer", goal="Review student code in real-time, provide hints without giving answers", backstory="Code review expert who teaches through guided discovery", tools=["analyze_code", "run_tests"]),
+        AgentRole(role="project_coach", goal="Scaffold hands-on projects and track milestone completion", backstory="Project-based learning specialist", tools=["scaffold_project", "track_progress"]),
+    ],
+    mcp_servers=[
+        MCPServerConfig(name="github", command="npx", args=["-y", "@github/mcp-server"], required_env=["GITHUB_TOKEN"], category="dev-tools"),
+    ],
+    required_fields=[
+        TemplateField(name="language", label="Programming Language", field_type="select", options=["python", "javascript", "scratch", "java", "c++", "r", "matlab"], required=True),
+        TemplateField(name="track", label="Learning Track", field_type="select", options=["intro-cs", "data-science", "web-dev", "robotics", "machine-learning", "algorithms", "cybersecurity"], required=True),
+    ],
+    optional_fields=[
+        TemplateField(name="skill_level", label="Starting Skill Level", field_type="select", options=["beginner", "intermediate", "advanced"], default="beginner"),
+        TemplateField(name="auto_grade", label="Auto-Grading", field_type="boolean", default=True, description="Automatically grade exercises with test cases"),
+        TemplateField(name="project_count", label="Number of Projects", field_type="number", default=3),
+    ],
+    estimated_cost="$25-60/month",
+    tags=["stem", "coding", "tutor", "cs-education", "auto-grading", "robotics", "data-science"],
+))
+
+# 15. Grant Writing Assistant Agent (LangGraph)
+_register(AgentTemplate(
+    id="grant-writing-assistant",
+    name="Grant Writing Assistant",
+    description="Multi-agent grant proposal pipeline — drafts narratives, builds budgets, checks compliance for NSF/NIH/DOD/EU formats.",
+    category=TemplateCategory.RESEARCH,
+    framework=FrameworkChoice.LANGGRAPH,
+    agents=[
+        AgentRole(role="narrative_writer", goal="Draft compelling research narratives, specific aims, and impact statements", backstory="Former program officer who has reviewed 1000+ proposals", tools=["web_search", "draft_section"]),
+        AgentRole(role="budget_builder", goal="Build detailed budgets with justifications matching funder requirements", backstory="Research administrator and budget specialist", tools=["calculate_budget", "generate_justification"]),
+        AgentRole(role="compliance_checker", goal="Verify proposal meets all funder guidelines, page limits, and formatting rules", backstory="Grants compliance officer with deep knowledge of federal requirements", tools=["check_compliance", "validate_format"]),
+    ],
+    mcp_servers=[
+        MCPServerConfig(name="web-search", command="npx", args=["-y", "@web-search/mcp-server"], required_env=["SEARCH_API_KEY"], category="tools"),
+        MCPServerConfig(name="filesystem", command="npx", args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp/grant-workspace"], required_env=[], category="tools"),
+    ],
+    required_fields=[
+        TemplateField(name="funding_agency", label="Funding Agency", field_type="select", options=["nsf", "nih", "dod", "doe", "darpa", "eu-horizon", "private-foundation", "other"], required=True),
+        TemplateField(name="research_area", label="Research Area", required=True, description="Primary research domain (e.g. computational biology, materials science)"),
+    ],
+    optional_fields=[
+        TemplateField(name="budget_ceiling", label="Budget Ceiling ($)", field_type="number", description="Maximum total budget for the proposal"),
+        TemplateField(name="duration_years", label="Project Duration (years)", field_type="number", default=3),
+        TemplateField(name="include_biosketch", label="Generate Biosketch Template", field_type="boolean", default=True),
+    ],
+    estimated_cost="$30-80/month",
+    tags=["research", "grant-writing", "nsf", "nih", "proposals", "academic", "funding"],
+))
+
+# 16. Systematic Literature Review Agent (LangGraph)
+_register(AgentTemplate(
+    id="systematic-lit-review",
+    name="Systematic Literature Review",
+    description="Automated systematic review pipeline — paper discovery, screening, data extraction, PRISMA flow, and bias assessment.",
+    category=TemplateCategory.RESEARCH,
+    framework=FrameworkChoice.LANGGRAPH,
+    agents=[
+        AgentRole(role="searcher", goal="Execute comprehensive searches across academic databases and generate keyword strategies", backstory="Information scientist and systematic review methodologist", tools=["web_search", "search_pubmed", "search_arxiv"]),
+        AgentRole(role="screener", goal="Apply inclusion/exclusion criteria and screen abstracts and full texts", backstory="Research assistant trained in systematic review protocols", tools=["screen_paper", "extract_metadata"]),
+        AgentRole(role="synthesizer", goal="Extract data, assess bias, generate PRISMA diagrams and summary tables", backstory="Meta-analysis expert who synthesizes evidence across studies", tools=["extract_data", "assess_bias", "generate_prisma"]),
+    ],
+    mcp_servers=[
+        MCPServerConfig(name="web-search", command="npx", args=["-y", "@web-search/mcp-server"], required_env=["SEARCH_API_KEY"], category="tools"),
+    ],
+    required_fields=[
+        TemplateField(name="research_question", label="Research Question", required=True, description="The primary research question using PICO/PECO format"),
+        TemplateField(name="databases", label="Databases to Search", field_type="multiselect", options=["pubmed", "arxiv", "scopus", "web-of-science", "cochrane", "ieee", "google-scholar"], required=True),
+    ],
+    optional_fields=[
+        TemplateField(name="date_range", label="Publication Date Range", description="e.g. 2020-2026"),
+        TemplateField(name="max_papers", label="Max Papers to Screen", field_type="number", default=500),
+        TemplateField(name="review_type", label="Review Type", field_type="select", options=["systematic-review", "scoping-review", "meta-analysis", "rapid-review"], default="systematic-review"),
+    ],
+    estimated_cost="$30-90/month",
+    tags=["research", "literature-review", "systematic-review", "prisma", "meta-analysis", "academic"],
+))
+
+# 17. Portfolio Risk Analyzer Agent (LangGraph)
+_register(AgentTemplate(
+    id="portfolio-risk-analyzer",
+    name="Portfolio Risk Analyzer",
+    description="Real-time portfolio monitoring — VaR calculations, sector exposure analysis, stress testing, and rebalancing recommendations.",
+    category=TemplateCategory.FINANCE,
+    framework=FrameworkChoice.LANGGRAPH,
+    agents=[
+        AgentRole(role="market_monitor", goal="Track real-time market data, news, and macro indicators", backstory="Quantitative analyst with expertise in market microstructure", tools=["fetch_market_data", "web_search"]),
+        AgentRole(role="risk_analyst", goal="Calculate VaR, stress tests, correlation matrices, and drawdown scenarios", backstory="Risk management specialist with CFA expertise", tools=["calculate_var", "stress_test", "correlation_analysis"]),
+        AgentRole(role="advisor", goal="Generate rebalancing recommendations and portfolio health reports", backstory="Senior portfolio strategist who communicates complex risk in plain language", tools=["generate_report", "recommend_rebalance"]),
+    ],
+    mcp_servers=[
+        MCPServerConfig(name="web-search", command="npx", args=["-y", "@web-search/mcp-server"], required_env=["SEARCH_API_KEY"], category="tools"),
+    ],
+    required_fields=[
+        TemplateField(name="portfolio_type", label="Portfolio Type", field_type="select", options=["equity", "fixed-income", "crypto", "mixed", "etf-only", "options"], required=True),
+        TemplateField(name="risk_tolerance", label="Risk Tolerance", field_type="select", options=["conservative", "moderate", "aggressive"], required=True),
+    ],
+    optional_fields=[
+        TemplateField(name="benchmark", label="Benchmark Index", field_type="select", options=["sp500", "nasdaq", "dow", "russell2000", "msci-world", "custom"], default="sp500"),
+        TemplateField(name="market_data_source", label="Market Data API", field_type="select", options=["yahoo-finance", "alpha-vantage", "polygon", "twelve-data"], default="yahoo-finance"),
+        TemplateField(name="report_frequency", label="Report Frequency", field_type="select", options=["real-time", "daily", "weekly", "monthly"], default="daily"),
+    ],
+    estimated_cost="$50-150/month",
+    tags=["finance", "portfolio", "risk", "var", "trading", "investing", "quantitative"],
+))
+
+# 18. Compliance & Fraud Detection Agent (CrewAI)
+_register(AgentTemplate(
+    id="compliance-fraud-detection",
+    name="Compliance & Fraud Detection",
+    description="Financial compliance automation — transaction monitoring, AML/KYC screening, anomaly detection, and regulatory report generation.",
+    category=TemplateCategory.FINANCE,
+    framework=FrameworkChoice.CREWAI,
+    agents=[
+        AgentRole(role="transaction_monitor", goal="Screen transactions for suspicious patterns and threshold violations", backstory="Anti-money laundering analyst with banking compliance expertise", tools=["scan_transactions", "flag_anomaly"]),
+        AgentRole(role="kyc_screener", goal="Verify customer identities against watchlists and sanctions databases", backstory="KYC/AML compliance officer", tools=["screen_entity", "check_sanctions"]),
+        AgentRole(role="report_generator", goal="Generate SARs, CTRs, and regulatory compliance reports", backstory="Regulatory reporting specialist for FinCEN and SEC", tools=["generate_sar", "generate_report"]),
+    ],
+    mcp_servers=[
+        MCPServerConfig(name="postgres", command="npx", args=["-y", "@postgres/mcp-server"], required_env=["DATABASE_URL"], category="data"),
+    ],
+    required_fields=[
+        TemplateField(name="regulation_framework", label="Regulatory Framework", field_type="multiselect", options=["aml-bsa", "kyc", "sox", "gdpr", "pci-dss", "dodd-frank", "mifid-ii"], required=True),
+        TemplateField(name="institution_type", label="Institution Type", field_type="select", options=["bank", "credit-union", "fintech", "broker-dealer", "insurance", "crypto-exchange"], required=True),
+    ],
+    optional_fields=[
+        TemplateField(name="alert_threshold", label="Alert Threshold ($)", field_type="number", default=10000, description="Transaction amount threshold for automatic flagging"),
+        TemplateField(name="sanctions_lists", label="Sanctions Lists", field_type="multiselect", options=["ofac-sdn", "un-sanctions", "eu-sanctions", "pep-lists"], default=["ofac-sdn"]),
+    ],
+    estimated_cost="$60-200/month",
+    tags=["finance", "compliance", "fraud", "aml", "kyc", "regulatory", "fintech"],
+))
+
+# 19. Mission Planning & Threat Intel Agent (LangGraph)
+_register(AgentTemplate(
+    id="mission-planning-intel",
+    name="Mission Planning & Threat Intel",
+    description="OSINT-driven intelligence agent — threat assessment briefs, logistics planning, COA analysis, and after-action report generation.",
+    category=TemplateCategory.MILITARY,
+    framework=FrameworkChoice.LANGGRAPH,
+    agents=[
+        AgentRole(role="osint_collector", goal="Gather and correlate open-source intelligence from multiple feeds", backstory="Intelligence analyst specializing in OSINT collection and fusion", tools=["web_search", "scrape", "monitor_feeds"]),
+        AgentRole(role="threat_assessor", goal="Analyze threats, generate risk matrices, and produce threat assessment briefs", backstory="Threat intelligence expert with DoD analytical framework experience", tools=["assess_threat", "generate_risk_matrix"]),
+        AgentRole(role="mission_planner", goal="Develop courses of action, logistics plans, and after-action reports", backstory="Military operations planner experienced in MDMP and JOPG processes", tools=["plan_coa", "logistics_calc", "generate_aar"]),
+    ],
+    mcp_servers=[
+        MCPServerConfig(name="web-search", command="npx", args=["-y", "@web-search/mcp-server"], required_env=["SEARCH_API_KEY"], category="tools"),
+        MCPServerConfig(name="filesystem", command="npx", args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp/mission-workspace"], required_env=[], category="tools"),
+    ],
+    required_fields=[
+        TemplateField(name="domain", label="Operations Domain", field_type="select", options=["land", "maritime", "air", "cyber", "space", "multi-domain"], required=True),
+        TemplateField(name="classification_level", label="Classification Level", field_type="select", options=["unclassified", "cui", "fouo"], required=True, description="Only unclassified data processing — no classified material"),
+    ],
+    optional_fields=[
+        TemplateField(name="osint_sources", label="OSINT Sources", field_type="multiselect", options=["news-feeds", "social-media", "satellite-imagery", "maritime-ais", "flight-tracking", "government-reports"], default=["news-feeds", "government-reports"]),
+        TemplateField(name="output_format", label="Output Format", field_type="select", options=["nato-stanag", "joint-pub", "custom-brief", "markdown"], default="markdown"),
+        TemplateField(name="aor", label="Area of Responsibility", description="Geographic region or area of interest"),
+    ],
+    estimated_cost="$40-120/month",
+    tags=["military", "defense", "osint", "threat-intel", "mission-planning", "logistics", "c2"],
+))
+
+# 20. Clinical Decision Support Agent (CrewAI)
+_register(AgentTemplate(
+    id="clinical-decision-support",
+    name="Clinical Decision Support",
+    description="Evidence-based clinical assistant — differential diagnosis, lab interpretation, drug interaction checks, and clinical note summarization.",
+    category=TemplateCategory.MEDICAL,
+    framework=FrameworkChoice.CREWAI,
+    agents=[
+        AgentRole(role="diagnostician", goal="Generate differential diagnoses ranked by probability based on symptoms and history", backstory="Board-certified internist with diagnostic reasoning expertise", tools=["differential_dx", "web_search"]),
+        AgentRole(role="pharmacist", goal="Check drug interactions, contraindications, and dosing recommendations", backstory="Clinical pharmacist specializing in polypharmacy and drug safety", tools=["check_interactions", "lookup_drug"]),
+        AgentRole(role="note_summarizer", goal="Summarize clinical notes, lab results, and generate structured reports", backstory="Medical scribe and clinical documentation improvement specialist", tools=["summarize_note", "interpret_labs"]),
+    ],
+    mcp_servers=[
+        MCPServerConfig(name="web-search", command="npx", args=["-y", "@web-search/mcp-server"], required_env=["SEARCH_API_KEY"], category="tools"),
+    ],
+    required_fields=[
+        TemplateField(name="specialty", label="Medical Specialty", field_type="select", options=["internal-medicine", "emergency", "pediatrics", "cardiology", "oncology", "neurology", "psychiatry", "radiology", "general-surgery"], required=True),
+        TemplateField(name="ehr_system", label="EHR System", field_type="select", options=["epic", "cerner", "allscripts", "meditech", "athenahealth", "standalone"], required=True),
+    ],
+    optional_fields=[
+        TemplateField(name="formulary", label="Drug Formulary", field_type="select", options=["cms-medicare", "va-national", "tricare", "custom", "none"], default="none"),
+        TemplateField(name="evidence_sources", label="Evidence Sources", field_type="multiselect", options=["uptodate", "pubmed", "cochrane", "dynamed", "epocrates"], default=["pubmed"]),
+        TemplateField(name="hipaa_strict", label="HIPAA Strict Mode", field_type="boolean", default=True, description="Enable strict PHI handling and audit logging"),
+    ],
+    estimated_cost="$50-150/month",
+    tags=["medical", "clinical", "diagnosis", "drug-interactions", "ehr", "hipaa", "decision-support"],
 ))
 
 

@@ -18,7 +18,7 @@
 
 ✨ **Conversational Configuration** - No code required, just chat
 🔌 **MCP-Native** - Built on Model Context Protocol (Linux Foundation standard)
-🎨 **12 Agent Templates** - Customer service, research, data analysis, code gen, multi-agent teams, sales & lead gen, content creation, e-commerce, operations, healthcare, real estate, education
+🎨 **20 Agent Templates** - Customer service, research, data analysis, code gen, multi-agent teams, sales & lead gen, content creation, e-commerce, operations, healthcare, real estate, education, STEM lab sim, STEM coding tutor, grant writing, literature review, portfolio risk, compliance & fraud, mission planning, clinical decision support
 🚀 **Three Deployment Options** - LOCAL (docker compose), CLOUD (Railway/Render), EXPORT (self-host)
 🔧 **Multi-Framework Support** - LangGraph, CrewAI, AutoGen, Semantic Kernel
 📦 **Production-Ready Output** - 7 files: agent.py, Dockerfile, docker-compose.yml, requirements.txt, .env.example, mcp-config.json, README.md
@@ -208,7 +208,7 @@ User Input → Conversational Wizard → Template Registry → Code Generator
    - Deployment target selection
 
 3. **Template Registry** (`backend/app/services/template_registry.py`)
-   - 12 built-in templates (customer-service, research, data-analysis, code-generation, multi-agent-team, sales-lead-gen, content-repurposer, ecommerce-analyzer, operations-sop, healthcare-practice, real-estate-marketing, education-builder)
+   - 20 built-in templates (customer-service, research, data-analysis, code-generation, multi-agent-team, sales-lead-gen, content-repurposer, ecommerce-analyzer, operations-sop, healthcare-practice, real-estate-marketing, education-builder, stem-lab-simulator, stem-coding-tutor, grant-writing-assistant, systematic-lit-review, portfolio-risk-analyzer, compliance-fraud-detection, mission-planning-intel, clinical-decision-support)
    - In-memory storage
    - Template metadata and configuration
 
@@ -384,6 +384,54 @@ railway up
 - **Agents:** Curriculum Designer, Content Generator, Assessment Builder
 - **Deployment:** LOCAL or CLOUD
 
+### 13. STEM Lab Simulator (LangGraph)
+- **Use Case:** Virtual physics/chemistry/biology experiments with adaptive difficulty
+- **MCP Servers:** filesystem
+- **Agents:** Experiment Designer, Simulation Engine, Tutor
+- **Deployment:** LOCAL or CLOUD
+
+### 14. STEM Coding Tutor (CrewAI)
+- **Use Case:** Interactive coding lessons, auto-grading, project scaffolding for CS/robotics/data science
+- **MCP Servers:** github
+- **Agents:** Instructor, Code Reviewer, Project Coach
+- **Deployment:** LOCAL or CLOUD
+
+### 15. Grant Writing Assistant (LangGraph)
+- **Use Case:** NSF/NIH/DOD grant proposals, budget building, compliance checking
+- **MCP Servers:** web-search, filesystem
+- **Agents:** Narrative Writer, Budget Builder, Compliance Checker
+- **Deployment:** LOCAL
+
+### 16. Systematic Literature Review (LangGraph)
+- **Use Case:** Paper discovery, abstract screening, PRISMA flow generation, bias assessment
+- **MCP Servers:** web-search
+- **Agents:** Searcher, Screener, Synthesizer
+- **Deployment:** LOCAL or CLOUD
+
+### 17. Portfolio Risk Analyzer (LangGraph)
+- **Use Case:** VaR calculations, stress testing, sector exposure, rebalancing recommendations
+- **MCP Servers:** web-search
+- **Agents:** Market Monitor, Risk Analyst, Advisor
+- **Deployment:** CLOUD or LOCAL
+
+### 18. Compliance & Fraud Detection (CrewAI)
+- **Use Case:** AML/KYC screening, transaction monitoring, SAR generation, anomaly detection
+- **MCP Servers:** postgres
+- **Agents:** Transaction Monitor, KYC Screener, Report Generator
+- **Deployment:** LOCAL (data security)
+
+### 19. Mission Planning & Threat Intel (LangGraph)
+- **Use Case:** OSINT collection, threat assessment, COA analysis, after-action reports
+- **MCP Servers:** web-search, filesystem
+- **Agents:** OSINT Collector, Threat Assessor, Mission Planner
+- **Deployment:** LOCAL (security)
+
+### 20. Clinical Decision Support (CrewAI)
+- **Use Case:** Differential diagnosis, drug interactions, lab interpretation, clinical notes
+- **MCP Servers:** web-search
+- **Agents:** Diagnostician, Pharmacist, Note Summarizer
+- **Deployment:** LOCAL (HIPAA compliance)
+
 ---
 
 ## 🌍 Real-World Example
@@ -458,7 +506,7 @@ docker compose up --build
 **Phase:** ✅ Foundation Complete
 **Implemented:**
 - ✅ Conversational wizard with chat UI
-- ✅ Template registry with 12 built-in templates
+- ✅ Template registry with 20 built-in templates
 - ✅ Jinja2-based code generation pipeline
 - ✅ 7-file package generation (agent.py, Dockerfile, etc.)
 - ✅ Copy-to-clipboard UI with visual feedback

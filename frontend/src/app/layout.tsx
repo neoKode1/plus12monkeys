@@ -23,6 +23,7 @@ export const metadata: Metadata = {
   title: "+12 Monkeys — Build AI Agents in Minutes",
   description: "Agent-as-a-Service platform with MCP integration",
   icons: {
+    icon: "/favicon-monkey.png",
     apple: "/favicon-monkey.png",
   },
 };

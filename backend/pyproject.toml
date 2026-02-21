@@ -1,6 +1,6 @@
 [project]
 name = "plus12monkeys"
-version = "0.1.0"
+version = "0.2.0"
 description = "Agent-as-a-Service Platform with MCP Integration"
 requires-python = ">=3.12"
 dependencies = [

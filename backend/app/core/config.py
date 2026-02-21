@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     # +12 Monkeys
     app_name: str = "+12 Monkeys"
-    app_version: str = "0.1.0"
+    app_version: str = "0.2.0"
     debug: bool = False
 
     # NANDA Index

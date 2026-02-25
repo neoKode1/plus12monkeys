@@ -56,12 +56,22 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <h1
-              className="text-5xl md:text-8xl lg:text-9xl font-semibold tracking-tighter text-zinc-100 leading-[0.85] reveal-text"
+            <div
+              className="flex items-center justify-center gap-6 md:gap-10 reveal-text"
               style={{ animationDelay: "0.2s" }}
             >
-              +12<br />MONKEYS
-            </h1>
+              <Image
+                src="/12monkey logo1-modified.png"
+                alt="+12 Monkeys"
+                width={160}
+                height={160}
+                className="w-24 h-24 md:w-36 md:h-36 lg:w-40 lg:h-40 object-contain brightness-0 invert opacity-80"
+                priority
+              />
+              <h1 className="text-5xl md:text-8xl lg:text-9xl font-semibold tracking-tighter text-zinc-100 leading-[0.85] text-left">
+                +12<br />MONKEYS
+              </h1>
+            </div>
 
             <p
               className="text-xs md:text-sm font-light tracking-[0.2em] text-zinc-500 uppercase reveal-text max-w-lg mx-auto leading-relaxed"
@@ -141,12 +151,28 @@ export default function LandingPage() {
                 </Link>
               </div>
             </div>
-            <div className="relative overflow-hidden order-1 lg:order-2 bg-zinc-900 border-l border-zinc-900/50 min-h-[40vh] lg:min-h-0">
+            <div className="relative overflow-hidden order-1 lg:order-2 bg-[#0a0a0a] border-l border-zinc-900/50 min-h-[40vh] lg:min-h-0">
               <div className="scan-line" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center space-y-4 p-8">
-                  <div className="text-[100px] md:text-[160px] font-mono text-zinc-900/50 leading-none select-none">01</div>
-                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-700">Conversational Configuration</p>
+              <div className="absolute inset-0 p-6 md:p-10 flex flex-col justify-center overflow-hidden">
+                <p className="text-[9px] font-mono uppercase tracking-widest text-zinc-600 mb-4">mcp-config.json</p>
+                <pre className="text-[11px] md:text-xs font-mono leading-relaxed text-zinc-500 whitespace-pre overflow-x-auto">
+<span className="text-zinc-700">{"{"}</span>
+  <span className="text-emerald-800">&quot;mcpServers&quot;</span>: {"{"}
+    <span className="text-emerald-800">&quot;research-agent&quot;</span>: {"{"}
+      <span className="text-zinc-600">&quot;command&quot;</span>: <span className="text-amber-900">&quot;python&quot;</span>,
+      <span className="text-zinc-600">&quot;args&quot;</span>: [<span className="text-amber-900">&quot;agent.py&quot;</span>],
+      <span className="text-zinc-600">&quot;env&quot;</span>: {"{"}
+        <span className="text-zinc-600">&quot;OPENAI_API_KEY&quot;</span>: <span className="text-amber-900">&quot;sk-...&quot;</span>
+      {"}"}
+    {"}"}
+  {"}"}
+<span className="text-zinc-700">{"}"}</span></pre>
+                <div className="mt-6 pt-4 border-t border-zinc-900/50">
+                  <p className="text-[10px] text-zinc-600 leading-relaxed">
+                    <span className="text-zinc-400">→</span> Tell the wizard what you need in plain English.
+                    It generates your MCP configuration, picks the right servers,
+                    and wires everything together automatically.
+                  </p>
                 </div>
               </div>
             </div>
@@ -154,12 +180,33 @@ export default function LandingPage() {
 
           {/* Pillar 2: GENERATE */}
           <div className="group relative grid grid-cols-1 lg:grid-cols-2 min-h-[80vh] border-b border-zinc-900/50">
-            <div className="relative overflow-hidden bg-zinc-900 border-r border-zinc-900/50 min-h-[40vh] lg:min-h-0">
+            <div className="relative overflow-hidden bg-[#0a0a0a] border-r border-zinc-900/50 min-h-[40vh] lg:min-h-0">
               <div className="scan-line" style={{ animationDuration: "3s" }} />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center space-y-4 p-8">
-                  <div className="text-[100px] md:text-[160px] font-mono text-zinc-900/50 leading-none select-none">02</div>
-                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-700">Multi-Language Packages</p>
+              <div className="absolute inset-0 p-6 md:p-10 flex flex-col justify-center overflow-hidden">
+                <p className="text-[9px] font-mono uppercase tracking-widest text-zinc-600 mb-4">agent.py — generated</p>
+                <pre className="text-[11px] md:text-xs font-mono leading-relaxed text-zinc-500 whitespace-pre overflow-x-auto">
+<span className="text-zinc-700">from</span> <span className="text-zinc-400">langgraph.graph</span> <span className="text-zinc-700">import</span> StateGraph
+<span className="text-zinc-700">from</span> <span className="text-zinc-400">mcp</span> <span className="text-zinc-700">import</span> ClientSession
+
+<span className="text-emerald-800">class</span> <span className="text-zinc-300">ResearchAgent</span>:
+    <span className="text-zinc-700">def</span> <span className="text-zinc-400">__init__</span>(self):
+        self.graph = StateGraph(AgentState)
+        self.graph.add_node(<span className="text-amber-900">&quot;search&quot;</span>, self.search)
+        self.graph.add_node(<span className="text-amber-900">&quot;analyze&quot;</span>, self.analyze)
+        self.graph.add_node(<span className="text-amber-900">&quot;summarize&quot;</span>, self.summarize)
+        self.graph.add_edge(<span className="text-amber-900">&quot;search&quot;</span>, <span className="text-amber-900">&quot;analyze&quot;</span>)
+        self.graph.add_edge(<span className="text-amber-900">&quot;analyze&quot;</span>, <span className="text-amber-900">&quot;summarize&quot;</span>)
+
+    <span className="text-zinc-700">async def</span> <span className="text-zinc-400">run</span>(self, query: str):
+        <span className="text-zinc-700">async with</span> ClientSession() <span className="text-zinc-700">as</span> mcp:
+            <span className="text-zinc-700">return await</span> self.graph.ainvoke(
+                {"{"}<span className="text-amber-900">&quot;query&quot;</span>: query{"}"}
+            )</pre>
+                <div className="mt-6 pt-4 border-t border-zinc-900/50">
+                  <p className="text-[10px] text-zinc-600 leading-relaxed">
+                    <span className="text-zinc-400">→</span> Production-ready agent code with MCP integration,
+                    Dockerfile, docker-compose, and environment configs — all generated from your conversation.
+                  </p>
                 </div>
               </div>
             </div>
@@ -203,11 +250,28 @@ export default function LandingPage() {
                 </Link>
               </div>
             </div>
-            <div className="relative overflow-hidden order-1 lg:order-2 bg-zinc-900 border-l border-zinc-900/50 min-h-[40vh] lg:min-h-0">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center space-y-4 p-8">
-                  <div className="text-[100px] md:text-[160px] font-mono text-zinc-900/50 leading-none select-none">03</div>
-                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-700">Production in 30 Seconds</p>
+            <div className="relative overflow-hidden order-1 lg:order-2 bg-[#0a0a0a] border-l border-zinc-900/50 min-h-[40vh] lg:min-h-0">
+              <div className="absolute inset-0 p-6 md:p-10 flex flex-col justify-center overflow-hidden">
+                <p className="text-[9px] font-mono uppercase tracking-widest text-zinc-600 mb-4">terminal</p>
+                <pre className="text-[11px] md:text-xs font-mono leading-relaxed text-zinc-500 whitespace-pre overflow-x-auto">
+<span className="text-zinc-600">$</span> <span className="text-zinc-300">docker compose up -d</span>
+<span className="text-emerald-800">✓</span> Container agent-mcp    <span className="text-emerald-800">Started</span>
+<span className="text-emerald-800">✓</span> Container agent-api    <span className="text-emerald-800">Started</span>
+<span className="text-emerald-800">✓</span> Container agent-worker <span className="text-emerald-800">Started</span>
+
+<span className="text-zinc-600">$</span> <span className="text-zinc-300">railway up</span>
+<span className="text-emerald-800">✓</span> Deploying to production...
+<span className="text-emerald-800">✓</span> Build completed in <span className="text-zinc-400">28s</span>
+<span className="text-emerald-800">✓</span> Live at <span className="text-zinc-400">agent.railway.app</span>
+
+<span className="text-zinc-700"># Or export &amp; self-host anywhere</span>
+<span className="text-zinc-600">$</span> <span className="text-zinc-300">+12m export --format k8s</span>
+<span className="text-emerald-800">✓</span> Kubernetes manifests written</pre>
+                <div className="mt-6 pt-4 border-t border-zinc-900/50">
+                  <p className="text-[10px] text-zinc-600 leading-relaxed">
+                    <span className="text-zinc-400">→</span> Run locally with Docker, deploy to Railway/Vercel with one command,
+                    or export Kubernetes manifests for your own infra. Your choice.
+                  </p>
                 </div>
               </div>
             </div>

@@ -57,15 +57,15 @@ export default function LandingPage() {
             </div>
 
             <div
-              className="flex items-center justify-center gap-6 md:gap-10 reveal-text"
+              className="flex items-center justify-center gap-4 md:gap-8 reveal-text"
               style={{ animationDelay: "0.2s" }}
             >
               <Image
-                src="/12monkey logo1-modified.png"
+                src="/favicon-monkey.png"
                 alt="+12 Monkeys"
-                width={160}
-                height={160}
-                className="w-24 h-24 md:w-36 md:h-36 lg:w-40 lg:h-40 object-contain brightness-0 invert opacity-80"
+                width={200}
+                height={200}
+                className="w-[100px] h-[100px] md:w-[180px] md:h-[180px] lg:w-[220px] lg:h-[220px] object-contain brightness-0 invert opacity-90"
                 priority
               />
               <h1 className="text-5xl md:text-8xl lg:text-9xl font-semibold tracking-tighter text-zinc-100 leading-[0.85] text-left">

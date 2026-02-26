@@ -38,8 +38,8 @@ function VerifyContent() {
       .then(async () => {
         setStatus("success");
         await refresh();
-        // Redirect to wizard after short delay
-        setTimeout(() => router.replace("/wizard"), 1500);
+        // Redirect to homepage after short delay
+        setTimeout(() => router.replace("/"), 1500);
       })
       .catch(() => {
         setStatus("error");
@@ -77,7 +77,7 @@ function VerifyContent() {
               ✓ Authenticated
             </p>
             <p className="text-sm text-zinc-400 font-light">
-              Redirecting to the wizard...
+              Redirecting...
             </p>
           </>
         )}

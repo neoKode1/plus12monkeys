@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { sendKey } from "@/lib/auth";
+import { useAuth } from "@/components/AuthProvider";
 
 /* ── Waveform Visualizer ── */
 function Waveform() {
@@ -58,6 +60,15 @@ export default function SignInPage() {
   const [loading, setLoading] = useState(false);
   const [scanTop, setScanTop] = useState(0);
   const time = useClock();
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+
+  /* If already authenticated, redirect to home */
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace("/");
+    }
+  }, [user, authLoading, router]);
 
   /* Scanner animation */
   useEffect(() => {

@@ -954,6 +954,96 @@ _reg(MCPServerEntry(
     tags=["music", "audio", "playback", "spotify", "media"],
 ))
 
+# ---- Agent Intelligence (inspired by production AI platform capabilities) ----
+
+_reg(MCPServerEntry(
+    id="netlify-deploy",
+    name="Netlify Deploy",
+    description="Deploy web applications to Netlify — create sites, manage deploys, check build status, and configure domains.",
+    category=MCPCategory.DEV_TOOLS,
+    command="npx",
+    args=["-y", "@anthropic/netlify-mcp-server"],
+    required_env=["NETLIFY_AUTH_TOKEN"],
+    npm_package="@anthropic/netlify-mcp-server",
+    documentation_url="https://github.com/anthropics/netlify-mcp-server",
+    icon="🔺",
+    tags=["deploy", "hosting", "netlify", "web", "ci-cd"],
+    is_official=True,
+))
+
+_reg(MCPServerEntry(
+    id="browser-preview",
+    name="Browser Preview",
+    description="Spin up browser previews for web servers — capture screenshots, console logs, and interact with pages for testing and debugging.",
+    category=MCPCategory.DEV_TOOLS,
+    command="npx",
+    args=["-y", "@anthropic/browser-preview-mcp-server"],
+    required_env=[],
+    npm_package="@anthropic/browser-preview-mcp-server",
+    documentation_url="https://github.com/anthropics/browser-preview-mcp-server",
+    icon="🌐",
+    tags=["browser", "preview", "testing", "screenshot", "debugging", "web"],
+))
+
+_reg(MCPServerEntry(
+    id="session-memory",
+    name="Session Memory",
+    description="Persistent memory database for agents — save user preferences, project context, milestones, and architectural decisions across sessions.",
+    category=MCPCategory.AI_ML,
+    command="npx",
+    args=["-y", "@anthropic/memory-mcp-server"],
+    required_env=[],
+    optional_env=["MEMORY_DB_PATH"],
+    npm_package="@anthropic/memory-mcp-server",
+    documentation_url="https://github.com/anthropics/memory-mcp-server",
+    icon="🧠",
+    tags=["memory", "persistence", "context", "preferences", "session"],
+    is_official=True,
+))
+
+_reg(MCPServerEntry(
+    id="planning",
+    name="Planning & Task Management",
+    description="Structured task planning for agents — create plans, track progress, manage dependencies, and generate numbered pseudocode execution steps.",
+    category=MCPCategory.PRODUCTIVITY,
+    command="npx",
+    args=["-y", "@anthropic/planning-mcp-server"],
+    required_env=[],
+    npm_package="@anthropic/planning-mcp-server",
+    documentation_url="https://github.com/anthropics/planning-mcp-server",
+    icon="📋",
+    tags=["planning", "tasks", "project-management", "execution", "workflow"],
+))
+
+_reg(MCPServerEntry(
+    id="integration-health",
+    name="Integration Health Check",
+    description="Monitor health of connected MCP servers and integrations — ping endpoints, check credentials, report status, and auto-retry failed connections.",
+    category=MCPCategory.DEV_TOOLS,
+    command="npx",
+    args=["-y", "@anthropic/integration-health-mcp-server"],
+    required_env=[],
+    npm_package="@anthropic/integration-health-mcp-server",
+    documentation_url="https://github.com/anthropics/integration-health-mcp-server",
+    icon="💚",
+    tags=["health", "monitoring", "integration", "status", "reliability"],
+))
+
+_reg(MCPServerEntry(
+    id="deploy-universal",
+    name="Universal Deploy",
+    description="Deploy applications to multiple platforms — Railway, Render, Vercel, Netlify, and Cloudflare Workers from a single interface.",
+    category=MCPCategory.DEV_TOOLS,
+    command="npx",
+    args=["-y", "@anthropic/deploy-mcp-server"],
+    required_env=[],
+    optional_env=["RAILWAY_TOKEN", "RENDER_API_KEY", "VERCEL_TOKEN", "NETLIFY_AUTH_TOKEN", "CLOUDFLARE_API_TOKEN"],
+    npm_package="@anthropic/deploy-mcp-server",
+    documentation_url="https://github.com/anthropics/deploy-mcp-server",
+    icon="🚀",
+    tags=["deploy", "hosting", "multi-platform", "ci-cd", "railway", "render", "vercel"],
+))
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
-import ChatWizard from "@/components/ChatWizard";
+import LandingPage from "@/components/LandingPage";
 
 export default function Home() {
-  return <ChatWizard />;
+  return <LandingPage />;
 }

@@ -43,7 +43,7 @@ async function apiFetch(
     const timer = setTimeout(() => controller.abort(), timeout);
 
     try {
-      const res = await fetch(input, { ...fetchInit, signal: controller.signal });
+      const res = await fetch(input, { ...fetchInit, signal: controller.signal, credentials: "include" });
       clearTimeout(timer);
 
       if (res.ok) return res;
@@ -282,6 +282,9 @@ export interface MCPToolSchema {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
+  safety_level: "safe" | "moderate" | "dangerous";
+  task_name_active: string | null;
+  task_name_complete: string | null;
 }
 
 export interface MCPServerEntry {

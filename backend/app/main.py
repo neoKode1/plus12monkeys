@@ -5,8 +5,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import agents, builds, health, mcp, templates, wizard
+from app.api import agents, auth, billing, builds, health, mcp, templates, webhook, wizard
 from app.core.config import settings
+from app.core.database import close_db
 from app.services.orchestrator import close_client
 
 
@@ -16,6 +17,7 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown — close shared clients
     await close_client()
+    await close_db()
 
 
 app = FastAPI(
@@ -41,11 +43,14 @@ app.add_middleware(
 
 # Mount routers
 app.include_router(health.router)
+app.include_router(auth.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(mcp.router, prefix="/api/v1")
 app.include_router(wizard.router, prefix="/api/v1")
 app.include_router(templates.router, prefix="/api/v1")
 app.include_router(builds.router, prefix="/api/v1")
+app.include_router(billing.router, prefix="/api/v1")
+app.include_router(webhook.router, prefix="/api/v1")
 
 
 @app.get("/")

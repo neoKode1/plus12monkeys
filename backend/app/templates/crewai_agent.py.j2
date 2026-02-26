@@ -18,7 +18,7 @@ load_dotenv()
 {{ agent.role }}_agent = Agent(
     role="{{ agent.role }}",
     goal="{{ agent.goal }}",
-    {% if agent.backstory %}backstory="{{ agent.backstory }}",{% endif %}
+    {% if agent.backstory %}backstory="{{ agent.backstory }}{% if agent.guidelines %}\n\n{{ agent.guidelines }}{% endif %}",{% elif agent.guidelines %}backstory="{{ agent.guidelines }}",{% endif %}
     verbose=True,
     allow_delegation=True,
     llm_model=os.getenv("LLM_MODEL", "claude-sonnet-4-20250514"),

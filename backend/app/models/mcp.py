@@ -26,11 +26,21 @@ class MCPServerStatus(str, Enum):
     CHECKING = "checking"
 
 
+class ToolSafetyLevel(str, Enum):
+    """Safety classification for tool auto-run decisions (inspired by Windsurf)."""
+    SAFE = "safe"            # Read-only: search, view, list — auto-run OK
+    MODERATE = "moderate"    # Additive: create file, add code — auto-run with logging
+    DANGEROUS = "dangerous"  # Destructive: delete, deploy, push — require confirmation
+
+
 class MCPToolSchema(BaseModel):
     """Schema for a single tool exposed by an MCP server."""
     name: str
     description: str = ""
     input_schema: Dict[str, Any] = Field(default_factory=dict)
+    safety_level: ToolSafetyLevel = ToolSafetyLevel.SAFE
+    task_name_active: Optional[str] = None   # UI label while running (v0 pattern)
+    task_name_complete: Optional[str] = None  # UI label when done (v0 pattern)
 
 
 class MCPServerEntry(BaseModel):

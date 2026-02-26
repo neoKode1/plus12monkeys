@@ -33,9 +33,9 @@ _register(AgentTemplate(
     category=TemplateCategory.CUSTOMER_SERVICE,
     framework=FrameworkChoice.CREWAI,
     agents=[
-        AgentRole(role="triage", goal="Classify and route incoming requests", backstory="Expert at understanding customer intent", tools=["search_kb"]),
-        AgentRole(role="specialist", goal="Handle domain-specific queries with detailed answers", backstory="Deep product knowledge specialist", tools=["search_kb", "lookup_order"]),
-        AgentRole(role="escalation", goal="Escalate complex issues to human agents", backstory="Knows when AI can't solve it", tools=["create_ticket"]),
+        AgentRole(role="triage", goal="Classify and route incoming requests", backstory="Expert at understanding customer intent", tools=["search_kb"], prompt_pattern_ids=["scope-strict", "comm-user-feedback"]),
+        AgentRole(role="specialist", goal="Handle domain-specific queries with detailed answers", backstory="Deep product knowledge specialist", tools=["search_kb", "lookup_order"], prompt_pattern_ids=["error-gather-first", "tool-summary"]),
+        AgentRole(role="escalation", goal="Escalate complex issues to human agents", backstory="Knows when AI can't solve it", tools=["create_ticket"], prompt_pattern_ids=["comm-browser-handoff", "safety-secrets"]),
     ],
     mcp_servers=[
         MCPServerConfig(name="salesforce", command="npx", args=["-y", "@salesforce/mcp-server"], required_env=["SALESFORCE_INSTANCE_URL", "SALESFORCE_ACCESS_TOKEN"], category="crm"),
@@ -61,9 +61,9 @@ _register(AgentTemplate(
     category=TemplateCategory.RESEARCH,
     framework=FrameworkChoice.LANGGRAPH,
     agents=[
-        AgentRole(role="planner", goal="Break research question into sub-queries", tools=["web_search"]),
-        AgentRole(role="researcher", goal="Execute searches and extract key findings", tools=["web_search", "scrape"]),
-        AgentRole(role="synthesizer", goal="Combine findings into a coherent report", tools=[]),
+        AgentRole(role="planner", goal="Break research question into sub-queries", tools=["web_search"], prompt_pattern_ids=["planning-agent-loop", "scope-conservative"]),
+        AgentRole(role="researcher", goal="Execute searches and extract key findings", tools=["web_search", "scrape"], prompt_pattern_ids=["planning-dual-mode", "error-gather-first"]),
+        AgentRole(role="synthesizer", goal="Combine findings into a coherent report", tools=[], prompt_pattern_ids=["scope-strict", "comm-user-feedback"]),
     ],
     mcp_servers=[
         MCPServerConfig(name="web-search", command="npx", args=["-y", "@web-search/mcp-server"], required_env=["SEARCH_API_KEY"], category="tools"),
@@ -87,8 +87,8 @@ _register(AgentTemplate(
     category=TemplateCategory.DATA_ANALYSIS,
     framework=FrameworkChoice.LANGGRAPH,
     agents=[
-        AgentRole(role="planner", goal="Translate natural language to a query plan", tools=[]),
-        AgentRole(role="executor", goal="Execute SQL/NoSQL queries safely", tools=["run_query"]),
+        AgentRole(role="planner", goal="Translate natural language to a query plan", tools=[], prompt_pattern_ids=["planning-dual-mode", "scope-strict"]),
+        AgentRole(role="executor", goal="Execute SQL/NoSQL queries safely", tools=["run_query"], prompt_pattern_ids=["safety-classification", "error-gather-first", "tool-summary"]),
     ],
     mcp_servers=[
         MCPServerConfig(name="postgres", command="npx", args=["-y", "@postgres/mcp-server"], required_env=["DATABASE_URL"], category="data"),
@@ -111,9 +111,9 @@ _register(AgentTemplate(
     category=TemplateCategory.CODE_GENERATION,
     framework=FrameworkChoice.LANGGRAPH,
     agents=[
-        AgentRole(role="planner", goal="Break specification into implementation tasks", tools=[]),
-        AgentRole(role="coder", goal="Write clean, tested code", tools=["file_write", "run_tests"]),
-        AgentRole(role="reviewer", goal="Review code for quality, security, and correctness", tools=["file_read"]),
+        AgentRole(role="planner", goal="Break specification into implementation tasks", tools=[], prompt_pattern_ids=["planning-agent-loop", "scope-strict"]),
+        AgentRole(role="coder", goal="Write clean, tested code", tools=["file_write", "run_tests"], prompt_pattern_ids=["coding-conventions", "coding-testing", "safety-secrets"]),
+        AgentRole(role="reviewer", goal="Review code for quality, security, and correctness", tools=["file_read"], prompt_pattern_ids=["coding-conventions", "error-gather-first"]),
     ],
     mcp_servers=[
         MCPServerConfig(name="github", command="npx", args=["-y", "@github/mcp-server"], required_env=["GITHUB_TOKEN"], category="dev-tools"),
@@ -137,9 +137,9 @@ _register(AgentTemplate(
     category=TemplateCategory.MULTI_AGENT,
     framework=FrameworkChoice.AUTOGEN,
     agents=[
-        AgentRole(role="coordinator", goal="Manage group conversation and task delegation", tools=[]),
-        AgentRole(role="worker", goal="Execute primary tasks assigned by coordinator", tools=[]),
-        AgentRole(role="critic", goal="Review outputs and suggest improvements", tools=[]),
+        AgentRole(role="coordinator", goal="Manage group conversation and task delegation", tools=[], prompt_pattern_ids=["planning-agent-loop", "scope-conservative", "comm-user-feedback"]),
+        AgentRole(role="worker", goal="Execute primary tasks assigned by coordinator", tools=[], prompt_pattern_ids=["coding-conventions", "error-gather-first"]),
+        AgentRole(role="critic", goal="Review outputs and suggest improvements", tools=[], prompt_pattern_ids=["error-gather-first", "scope-strict"]),
     ],
     mcp_servers=[],
     required_fields=[
@@ -161,9 +161,9 @@ _register(AgentTemplate(
     category=TemplateCategory.SALES_MARKETING,
     framework=FrameworkChoice.LANGGRAPH,
     agents=[
-        AgentRole(role="prospector", goal="Discover and qualify new leads from web sources", backstory="Expert at finding high-intent prospects", tools=["web_search", "domain_lookup"]),
-        AgentRole(role="outreach_writer", goal="Generate personalized email and proposal copy", backstory="Skilled copywriter who personalizes at scale", tools=["email_draft"]),
-        AgentRole(role="pipeline_tracker", goal="Track lead status and follow-up schedules", backstory="CRM specialist who never lets a lead slip", tools=["crm_update"]),
+        AgentRole(role="prospector", goal="Discover and qualify new leads from web sources", backstory="Expert at finding high-intent prospects", tools=["web_search", "domain_lookup"], prompt_pattern_ids=["planning-dual-mode", "safety-secrets"]),
+        AgentRole(role="outreach_writer", goal="Generate personalized email and proposal copy", backstory="Skilled copywriter who personalizes at scale", tools=["email_draft"], prompt_pattern_ids=["scope-conservative", "comm-user-feedback"]),
+        AgentRole(role="pipeline_tracker", goal="Track lead status and follow-up schedules", backstory="CRM specialist who never lets a lead slip", tools=["crm_update"], prompt_pattern_ids=["tool-summary", "error-gather-first"]),
     ],
     mcp_servers=[
         MCPServerConfig(name="web-search", command="npx", args=["-y", "@web-search/mcp-server"], required_env=["SEARCH_API_KEY"], category="tools"),

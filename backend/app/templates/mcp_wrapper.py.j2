@@ -45,6 +45,25 @@ REPO_URL = "{{ repo_url }}"
 REPO_DIR = os.environ.get("REPO_DIR", "./{{ repo_name }}")
 MAX_OUTPUT = 8000  # truncate large outputs to stay context-friendly
 
+# ---------------------------------------------------------------------------
+# Tool metadata — UI feedback & safety classification
+# Inspired by v0 (taskNameActive/Complete) and Windsurf (SafeToAutoRun).
+# Consuming agents can read this to drive progress indicators and auto-run
+# decisions without hard-coding tool names.
+# ---------------------------------------------------------------------------
+TOOL_METADATA = {
+    "search": {
+        "safety_level": "safe",          # read-only — auto-run OK
+        "task_name_active": "Searching repository",
+        "task_name_complete": "Searched repository",
+    },
+    "execute": {
+        "safety_level": "moderate",      # runs code — log & proceed
+        "task_name_active": "Executing code",
+        "task_name_complete": "Executed code",
+    },
+}
+
 app = Server("{{ project_name }}")
 
 
@@ -172,6 +191,9 @@ async def list_tools() -> List[Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
     """Handle search and execute tool calls."""
+    # Log tool summary for observability (Windsurf pattern)
+    meta = TOOL_METADATA.get(name, {})
+    logger.info("[%s] %s", name, meta.get("task_name_active", name))
     code = arguments.get("code", "")
 
     if name == "search":

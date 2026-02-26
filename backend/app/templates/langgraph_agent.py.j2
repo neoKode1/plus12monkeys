@@ -42,6 +42,11 @@ def {{ agent.role }}_node(state: AgentState) -> Dict[str, Any]:
     """{{ agent.goal }}"""
     prompt = (
         f"You are the {{ agent.role }} agent. Your goal: {{ agent.goal }}\n\n"
+{% if agent.guidelines %}
+        # Agent guidelines (generated from +12 Monkeys prompt patterns)
+        """{{ agent.guidelines }}"""
+        "\n\n"
+{% endif %}
         f"Input: {state.get('input', '')}\n"
         {% if not loop.first %}
         {% set prev = agents[loop.index0 - 1] %}

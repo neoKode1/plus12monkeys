@@ -8,6 +8,10 @@
 {% for var in server.required_env %}
         "{{ var }}": "{{ '${' }}{{ var }}{{ '}' }}"{{ "," if not loop.last else "" }}
 {% endfor %}
+      },
+      "_meta": {
+        "category": "{{ server.category | default('tools') }}",
+        "safetyDefault": "safe"
       }
     }{{ "," if not loop.last else "" }}
 {% endfor %}

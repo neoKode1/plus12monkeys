@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import DOMPurify from "isomorphic-dompurify";
 import JSZip from "jszip";
 import {
@@ -12,6 +13,7 @@ import {
   sendMessageStream,
   StreamEvent,
 } from "@/lib/api";
+import { recordUsage, createCheckout, getBillingStatus, BillingStatus } from "@/lib/auth";
 
 
 interface DisplayMessage {
@@ -149,10 +151,10 @@ function TypewriterMessage({
 
 /* ── Progress Stepper ── */
 const STEPS = [
-  { key: "gathering", label: "Describe", icon: "💬" },
-  { key: "recommending", label: "Analyze", icon: "🔍" },
-  { key: "confirmed", label: "Build", icon: "🛠️" },
-  { key: "complete", label: "Ready", icon: "✅" },
+  { key: "gathering", label: "Describe", num: "01" },
+  { key: "recommending", label: "Analyze", num: "02" },
+  { key: "confirmed", label: "Build", num: "03" },
+  { key: "complete", label: "Ready", num: "04" },
 ];
 
 function ProgressStepper({ status }: { status: string }) {
@@ -166,16 +168,16 @@ function ProgressStepper({ status }: { status: string }) {
         const isActive = i === idx;
         return (
           <div key={step.key} className="flex items-center">
-            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-500 ${
-              isDone ? "text-[#34D399]" : isActive ? "text-[#6C63FF] bg-[#6C63FF]/10" : "text-[#555]"
+            <div className={`flex items-center gap-1.5 px-2 py-1 text-[10px] font-mono uppercase tracking-widest transition-all duration-500 ${
+              isDone ? "text-emerald-600" : isActive ? "text-zinc-200" : "text-zinc-700"
             }`}>
-              <span>{isDone ? "✓" : step.icon}</span>
+              <span className="text-[9px]">{step.num}</span>
               <span>{step.label}</span>
             </div>
             {i < STEPS.length - 1 && (
               <div
-                className="w-8 h-[2px] mx-1 rounded step-connector"
-                style={{ background: i < idx ? "#34D399" : i === idx ? "#6C63FF" : "#2A2A2A" }}
+                className="w-6 h-px mx-1 step-connector"
+                style={{ background: i < idx ? "#065f46" : i === idx ? "#52525b" : "#18181b" }}
               />
             )}
           </div>
@@ -201,12 +203,20 @@ export default function ChatWizard() {
   const [typingIdx, setTypingIdx] = useState<number | null>(null);
   const [streamingIdx, setStreamingIdx] = useState<number | null>(null);
   const [toolStatus, setToolStatus] = useState<string | null>(null);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [billingInfo, setBillingInfo] = useState<BillingStatus | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  // Fetch billing status on mount
+  useEffect(() => {
+    getBillingStatus().then(setBillingInfo);
+  }, []);
 
   useEffect(() => {
     setMessages([
@@ -229,9 +239,27 @@ export default function ChatWizard() {
     /https?:\/\/(github\.com|huggingface\.co)\/[^\s]+/.test(text) ||
     /git@github\.com:[^\s]+/.test(text);
 
+  const handleUpgrade = useCallback(async () => {
+    setCheckoutLoading(true);
+    const url = await createCheckout();
+    setCheckoutLoading(false);
+    if (url) window.location.href = url;
+  }, []);
+
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text || loading) return;
+
+    // Check usage before allowing interaction
+    const usage = await recordUsage();
+    if (usage && !usage.allowed) {
+      setBillingInfo((prev) => prev ? { ...prev, needs_upgrade: true, usage_count: usage.usage_count } : prev);
+      setShowPaywall(true);
+      return;
+    }
+    if (usage) {
+      setBillingInfo((prev) => prev ? { ...prev, usage_count: usage.usage_count } : prev);
+    }
 
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: text }]);
@@ -324,82 +352,77 @@ export default function ChatWizard() {
   }, [sessionId, generating, projectName]);
 
   return (
-    <div className="flex h-screen flex-col" style={{ background: "#0D0D0D", color: "#E8E8E8" }}>
+    <div className="relative flex h-screen flex-col bg-[#030303] text-zinc-400">
 
       {/* ══════════ Top Header Bar ══════════ */}
-      <header className="border-b shrink-0" style={{ borderColor: "#1A1A1A" }}>
-        <div className="flex items-center justify-between px-3 sm:px-5 py-2 sm:py-3">
-          {/* Left: brand logo */}
-          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+      <header className="border-b border-zinc-900/50 shrink-0 bg-[#030303]/80 backdrop-blur-sm z-30">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
+          {/* Left: brand */}
+          <Link href="/" className="flex items-center gap-2.5 min-w-0 hover:opacity-80 transition">
             <Image
               src="/favicon-monkey.png"
               alt="+12 Monkeys"
-              width={36}
-              height={36}
-              className="h-7 w-7 sm:h-9 sm:w-9 brightness-0 invert shrink-0"
+              width={28}
+              height={28}
+              className="h-6 w-6 sm:h-7 sm:w-7 brightness-0 invert shrink-0 opacity-80"
             />
-            <span
-              className="text-white uppercase truncate"
-              style={{
-                fontSize: "clamp(16px, 4vw, 24px)",
-                fontFamily: "var(--font-brand), 'Barlow Condensed', sans-serif",
-                fontWeight: 300,
-                letterSpacing: "0.16em",
-                lineHeight: 1,
-              }}
-            >
-              +12 Monkeys
-            </span>
-          </div>
+            <div>
+              <span className="text-[10px] font-mono tracking-[0.3em] text-zinc-300 uppercase font-bold block">
+                +12 Monkeys
+              </span>
+              <div className="h-px w-8 bg-zinc-800 mt-1" />
+            </div>
+          </Link>
 
           {/* Center: stepper — hidden on mobile */}
           <div className="hidden md:block">
             <ProgressStepper status={status} />
           </div>
 
-          {/* Right: actions — collapsed on mobile */}
-          <div className="flex items-center gap-1 shrink-0">
-            <a href="/mcp" className="px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-[12px] font-medium text-[#6C63FF] hover:bg-[#6C63FF]/10 transition">
+          {/* Right: actions */}
+          <div className="flex items-center gap-3 shrink-0">
+            <a href="/mcp" className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-zinc-200 transition-colors">
               MCP
             </a>
-            {/* Desktop-only action buttons */}
             <div className="hidden sm:flex items-center gap-1">
               {[IconDownload, IconBookmark, IconHistory, IconEdit].map((Icon, i) => (
-                <button key={i} className="p-1.5 rounded-lg transition hover:bg-white/10 text-[#888]">
+                <button key={i} className="p-1.5 transition hover:bg-zinc-900 text-zinc-600 hover:text-zinc-400">
                   <Icon />
                 </button>
               ))}
             </div>
+            <div className="flex items-center gap-2 ml-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-900 animate-pulse border border-emerald-500/30" />
+              <span className="text-[9px] uppercase tracking-widest text-zinc-700 font-mono hidden sm:inline">Active</span>
+            </div>
           </div>
         </div>
-        {/* Mobile-only stepper — compact below header */}
-        <div className="md:hidden border-t" style={{ borderColor: "#1A1A1A" }}>
+        {/* Mobile-only stepper */}
+        <div className="md:hidden border-t border-zinc-900/50">
           <ProgressStepper status={status} />
         </div>
       </header>
 
       {/* ══════════ Messages (scrollable area) ══════════ */}
-      <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="max-w-3xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 w-full">
+      <div className="flex-1 overflow-y-auto min-h-0 relative z-10">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5 sm:space-y-7 w-full">
           {messages.map((m, i) => (
             <div key={i} className="msg-enter">
               {m.role === "user" ? (
-                /* ── User bubble ── */
+                /* ── User message ── */
                 <div className="flex justify-end">
-                  <div className="max-w-[85%] sm:max-w-[80%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed"
-                    style={{ background: "#1A1A1A", color: "#E8E8E8" }}>
+                  <div className="max-w-[85%] sm:max-w-[80%] border border-zinc-800 bg-[#050505] px-4 py-3 text-[13px] leading-relaxed text-zinc-300">
                     {m.content}
                   </div>
                 </div>
               ) : (
                 /* ── Assistant flowing text ── */
                 <div className="space-y-2">
-                  <div className="assistant-content text-[14px] leading-[1.75] text-[#D4D4D4]">
+                  <div className="assistant-content text-[13px] leading-[1.8] text-zinc-400">
                     {streamingIdx === i ? (
-                      /* Live-streaming: render content as it arrives */
                       <>
                         <span dangerouslySetInnerHTML={{ __html: formatAssistant(m.content) }} />
-                        <span className="inline-block w-2 h-4 bg-[#6C63FF] animate-pulse ml-0.5 align-middle rounded-sm" />
+                        <span className="inline-block w-1.5 h-4 bg-zinc-600 animate-pulse ml-0.5 align-middle" />
                       </>
                     ) : typingIdx === i ? (
                       <TypewriterMessage
@@ -410,31 +433,31 @@ export default function ChatWizard() {
                       <span dangerouslySetInnerHTML={{ __html: formatAssistant(m.content) }} />
                     )}
                   </div>
-                  {/* Tool status indicator while streaming */}
+                  {/* Tool status indicator */}
                   {streamingIdx === i && toolStatus && (
-                    <div className="flex items-center gap-2 text-xs text-[#6C63FF] animate-pulse">
-                      <span className="typing-dot w-1.5 h-1.5 rounded-full bg-[#6C63FF]" />
+                    <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-zinc-600 animate-pulse">
+                      <span className="typing-dot w-1.5 h-1.5 rounded-full bg-zinc-600" />
                       {toolStatus}
                     </div>
                   )}
-                  {/* Action buttons row (only show when done) */}
+                  {/* Action buttons */}
                   {typingIdx !== i && streamingIdx !== i && m.content && (
-                    <div className="flex items-center gap-1 pt-1">
+                    <div className="flex items-center gap-0.5 pt-1">
                       <button
                         onClick={() => handleCopy(m.content, i)}
-                        className="p-1.5 rounded-md transition hover:bg-white/10 text-[#555] hover:text-[#aaa]"
+                        className="p-1.5 transition hover:bg-zinc-900 text-zinc-700 hover:text-zinc-400"
                         title="Copy"
                       >
                         {copiedIdx === i ? (
-                          <span className="text-[11px] text-green-400 px-1">Copied</span>
+                          <span className="text-[9px] font-mono uppercase tracking-widest text-emerald-700 px-1">Copied</span>
                         ) : (
                           <IconCopy />
                         )}
                       </button>
-                      <button className="p-1.5 rounded-md transition hover:bg-white/10 text-[#555] hover:text-[#aaa]" title="Good response">
+                      <button className="p-1.5 transition hover:bg-zinc-900 text-zinc-700 hover:text-zinc-400" title="Good response">
                         <IconThumbUp />
                       </button>
-                      <button className="p-1.5 rounded-md transition hover:bg-white/10 text-[#555] hover:text-[#aaa]" title="Bad response">
+                      <button className="p-1.5 transition hover:bg-zinc-900 text-zinc-700 hover:text-zinc-400" title="Bad response">
                         <IconThumbDown />
                       </button>
                     </div>
@@ -444,24 +467,24 @@ export default function ChatWizard() {
             </div>
           ))}
 
-          {/* Typing indicator — only show when loading AND no streamed content yet */}
+          {/* Typing indicator */}
           {loading && streamingIdx === null && (
-            <div className="msg-enter flex items-center gap-1 py-2">
+            <div className="msg-enter flex items-center gap-1.5 py-2">
               {analyzingRepo ? (
-                <span className="text-sm text-[#6C63FF] flex items-center gap-2">
-                  <span className="typing-dot w-2 h-2 rounded-full bg-[#6C63FF]" />
-                  🔍 Analyzing repository…
+                <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                  <span className="typing-dot w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                  Analyzing repository…
                 </span>
               ) : toolStatus ? (
-                <span className="text-sm text-[#6C63FF] flex items-center gap-2">
-                  <span className="typing-dot w-2 h-2 rounded-full bg-[#6C63FF]" />
+                <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                  <span className="typing-dot w-1.5 h-1.5 rounded-full bg-zinc-500" />
                   {toolStatus}
                 </span>
               ) : (
                 <>
-                  <span className="typing-dot w-2 h-2 rounded-full bg-[#6C63FF]" />
-                  <span className="typing-dot w-2 h-2 rounded-full bg-[#6C63FF]" />
-                  <span className="typing-dot w-2 h-2 rounded-full bg-[#6C63FF]" />
+                  <span className="typing-dot w-1.5 h-1.5 rounded-full bg-zinc-600" />
+                  <span className="typing-dot w-1.5 h-1.5 rounded-full bg-zinc-600" />
+                  <span className="typing-dot w-1.5 h-1.5 rounded-full bg-zinc-600" />
                 </>
               )}
             </div>
@@ -493,33 +516,97 @@ export default function ChatWizard() {
       )}
 
       {/* ══════════ Input Bar — pinned to bottom ══════════ */}
-      <div className="shrink-0 border-t px-3 sm:px-6 py-2 sm:py-3" style={{ borderColor: "#1A1A1A", background: "#0D0D0D" }}>
+      <div className="shrink-0 border-t border-zinc-900/50 px-4 sm:px-6 py-3 sm:py-4 bg-[#030303] relative z-20">
         <form
           onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-          className="max-w-3xl mx-auto flex items-center gap-2 rounded-2xl px-3 sm:px-4 py-2"
-          style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}
+          className="max-w-3xl mx-auto flex items-center gap-3"
         >
-          <button type="button" className="p-1.5 rounded-lg text-[#555] hover:text-[#aaa] transition hover:bg-white/5 shrink-0">
+          <button type="button" className="p-1.5 text-zinc-700 hover:text-zinc-400 transition shrink-0">
             <IconAttach />
           </button>
           <input
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask anything"
-            className="flex-1 min-w-0 bg-transparent text-[14px] text-[#E8E8E8] placeholder-[#555] outline-none py-2"
+            placeholder="DESCRIBE YOUR AGENT"
+            className="flex-1 min-w-0 bg-transparent border-b border-zinc-800 text-[11px] font-mono text-zinc-300 placeholder-zinc-800 uppercase tracking-widest outline-none py-2 focus:border-zinc-500 transition-colors"
             disabled={loading || status === "complete"}
           />
           <button
             type="submit"
             disabled={loading || !input.trim() || status === "complete"}
-            className="p-2 rounded-full transition disabled:opacity-30 shrink-0"
-            style={{ background: input.trim() ? "#6C63FF" : "#333" }}
+            className="p-2 border border-zinc-800 text-zinc-500 hover:bg-zinc-900 hover:text-white transition disabled:opacity-20 shrink-0"
           >
             <IconSend />
           </button>
         </form>
       </div>
+
+      {/* ══════════ Usage Counter ══════════ */}
+      {billingInfo && billingInfo.plan === "free" && (
+        <div className="absolute top-3 right-4 z-30 flex items-center gap-2">
+          <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-700">
+            {billingInfo.usage_count}/{billingInfo.free_limit} free
+          </span>
+          <button
+            onClick={handleUpgrade}
+            className="text-[9px] font-mono uppercase tracking-widest text-[#00FF41] hover:text-[#00CC33] transition"
+          >
+            Go Pro →
+          </button>
+        </div>
+      )}
+      {billingInfo && billingInfo.plan === "pro" && (
+        <div className="absolute top-3 right-4 z-30 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#00FF41]" />
+          <span className="text-[9px] font-mono uppercase tracking-widest text-[#00FF41]">PRO</span>
+        </div>
+      )}
+
+      {/* ══════════ Paywall Modal ══════════ */}
+      {showPaywall && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="border border-zinc-800 bg-[#050505] p-8 max-w-md w-full mx-4 space-y-6">
+            <div className="space-y-2 text-center">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-700">FREE LIMIT REACHED</div>
+              <h2 className="text-lg font-light text-zinc-200">Upgrade to Pro</h2>
+              <p className="text-xs text-zinc-500 leading-relaxed">
+                You&apos;ve used all {billingInfo?.free_limit} free interactions.
+                Unlock unlimited access for just <strong className="text-zinc-300">$10/year</strong>.
+              </p>
+            </div>
+            <div className="border border-zinc-800 bg-[#030303] p-4 space-y-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-zinc-500 font-mono">Plan</span>
+                <span className="text-zinc-300">+12 Monkeys Pro</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-zinc-500 font-mono">Price</span>
+                <span className="text-zinc-300">$10 / year</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-zinc-500 font-mono">Access</span>
+                <span className="text-zinc-300">Unlimited</span>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowPaywall(false)}
+                className="flex-1 border border-zinc-800 py-3 text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:bg-zinc-900 transition"
+              >
+                Maybe Later
+              </button>
+              <button
+                onClick={handleUpgrade}
+                disabled={checkoutLoading}
+                className="flex-1 bg-[#00FF41] py-3 text-[10px] font-mono uppercase tracking-widest text-black hover:bg-[#00CC33] transition disabled:opacity-50"
+              >
+                {checkoutLoading ? "Loading…" : "Go Pro →"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -579,78 +666,77 @@ function RecommendationPanel({
       : [isDeveloper ? "None" : "No extra services needed"];
 
   return (
-    <div className="border-t px-3 sm:px-4 py-3 sm:py-4 shrink-0 overflow-y-auto max-h-[50vh] sm:max-h-[40vh]" style={{ borderColor: "#1A1A1A", background: "#111111" }}>
-      <div className="max-w-3xl mx-auto space-y-3 sm:space-y-4">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">✨</span>
-          <h2 className="text-sm font-semibold text-[#34D399]">
-            {isDeveloper ? "Agent Configuration" : "Your AI Assistant Plan"}
-          </h2>
+    <div className="border-t border-zinc-900/50 px-4 sm:px-6 py-4 sm:py-5 shrink-0 overflow-y-auto max-h-[50vh] sm:max-h-[40vh] bg-[#050505] relative z-20">
+      <div className="max-w-3xl mx-auto space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="text-[10px] font-mono text-zinc-700 tracking-widest uppercase">Configuration</span>
+            <h2 className="text-sm font-light text-zinc-200">
+              {isDeveloper ? "Agent Configuration" : "Your AI Assistant Plan"}
+            </h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-900 border border-emerald-500/30" />
+            <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-700">Ready</span>
+          </div>
         </div>
-        <p className="text-[13px] text-[#B0B0B0] leading-relaxed">{rec.summary}</p>
+        <p className="text-xs text-zinc-500 font-light leading-relaxed">{rec.summary}</p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs">
-          {/* Framework card — developers only */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
           {isDeveloper && (
-            <div className="rounded-xl p-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
-              <span className="text-[#666] text-[11px] uppercase tracking-wide">Framework</span>
-              <p className="mt-1 font-medium text-[#E8E8E8] text-[13px]">{rec.framework}</p>
-              <p className="mt-0.5 text-[11px] text-[#888]">{rec.framework_reason}</p>
+            <div className="border border-zinc-800 bg-[#030303] p-4">
+              <span className="text-[10px] font-mono text-zinc-700 uppercase tracking-widest">Framework</span>
+              <p className="mt-2 font-medium text-zinc-300 text-[13px]">{rec.framework}</p>
+              <p className="mt-1 text-[10px] text-zinc-600 font-mono">{rec.framework_reason}</p>
             </div>
           )}
-          <div className="rounded-xl p-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
-            <span className="text-[#666] text-[11px] uppercase tracking-wide">
-              {isDeveloper ? "Agent roles" : "What it can do"}
+          <div className="border border-zinc-800 bg-[#030303] p-4">
+            <span className="text-[10px] font-mono text-zinc-700 uppercase tracking-widest">
+              {isDeveloper ? "Agent Roles" : "Capabilities"}
             </span>
-            <ul className="mt-1 space-y-0.5">
+            <ul className="mt-2 space-y-1">
               {capabilities.map((c, i) => (
-                <li key={i} className="font-medium text-[#E8E8E8] text-[13px]">• {c}</li>
+                <li key={i} className="text-zinc-300 text-[12px]">— {c}</li>
               ))}
             </ul>
           </div>
-          <div className="rounded-xl p-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
-            <span className="text-[#666] text-[11px] uppercase tracking-wide">
-              {isDeveloper ? "MCP servers" : "Connected services"}
+          <div className="border border-zinc-800 bg-[#030303] p-4">
+            <span className="text-[10px] font-mono text-zinc-700 uppercase tracking-widest">
+              {isDeveloper ? "MCP Servers" : "Services"}
             </span>
-            <ul className="mt-1 space-y-0.5">
+            <ul className="mt-2 space-y-1">
               {connectedServices.map((s, i) => (
-                <li key={i} className="font-medium text-[#E8E8E8] text-[13px]">{isDeveloper ? s : s}</li>
+                <li key={i} className="text-zinc-300 text-[12px]">{isDeveloper ? s : s}</li>
               ))}
             </ul>
           </div>
-          <div className="rounded-xl p-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
-            <span className="text-[#666] text-[11px] uppercase tracking-wide">
+          <div className="border border-zinc-800 bg-[#030303] p-4">
+            <span className="text-[10px] font-mono text-zinc-700 uppercase tracking-widest">
               {isDeveloper ? "Deployment" : "Hosting"}
             </span>
-            <p className="mt-1 font-medium text-[#E8E8E8] text-[13px]">{friendlyDeployment}</p>
+            <p className="mt-2 text-zinc-300 text-[12px]">{friendlyDeployment}</p>
           </div>
           {rec.estimated_monthly_cost && (
-            <div className="rounded-xl p-3" style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}>
-              <span className="text-[#666] text-[11px] uppercase tracking-wide">Estimated cost</span>
-              <p className="mt-1 font-medium text-[#E8E8E8] text-[13px]">About {rec.estimated_monthly_cost}/month</p>
+            <div className="border border-zinc-800 bg-[#030303] p-4">
+              <span className="text-[10px] font-mono text-zinc-700 uppercase tracking-widest">Cost</span>
+              <p className="mt-2 text-zinc-300 text-[12px]">~{rec.estimated_monthly_cost}/mo</p>
             </div>
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 pt-1">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2 border-t border-zinc-900">
           <input
             value={projectName}
             onChange={(e) => setProjectName(e.target.value)}
-            placeholder={isDeveloper ? "Project name" : "Name your assistant"}
-            className="rounded-xl px-3 py-2 text-sm text-[#E8E8E8] outline-none transition w-full sm:w-auto"
-            style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}
-            onFocus={(e) => (e.target.style.borderColor = "#6C63FF")}
-            onBlur={(e) => (e.target.style.borderColor = "#2A2A2A")}
+            placeholder={isDeveloper ? "PROJECT NAME" : "NAME YOUR ASSISTANT"}
+            className="bg-transparent border-b border-zinc-800 px-1 py-2 text-[11px] font-mono text-zinc-300 placeholder-zinc-800 uppercase tracking-widest outline-none focus:border-zinc-500 transition-colors w-full sm:w-auto"
           />
           <button
             onClick={onGenerate}
             disabled={generating}
-            className="rounded-xl px-5 py-2 text-sm font-medium text-white transition disabled:opacity-40 whitespace-nowrap"
-            style={{ background: "#6C63FF" }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "#7B73FF")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "#6C63FF")}
+            className="border border-zinc-800 px-6 py-2.5 text-[10px] font-mono uppercase tracking-widest text-zinc-400 hover:bg-zinc-900 hover:text-white transition-all disabled:opacity-30 whitespace-nowrap"
           >
-            {generating ? "Generating…" : isDeveloper ? "🚀 Generate Agent" : "✨ Build My Assistant"}
+            {generating ? "Generating…" : isDeveloper ? "Generate Agent" : "Build Assistant"}
           </button>
         </div>
       </div>
@@ -668,14 +754,15 @@ function PackagePreview({
   onSelectFile: (f: GeneratedFile) => void;
 }) {
   return (
-    <div className="border-t flex flex-col shrink-0" style={{ maxHeight: "50vh", borderColor: "#1A1A1A", background: "#111111" }}>
+    <div className="border-t border-zinc-900/50 flex flex-col shrink-0 bg-[#050505] relative z-20" style={{ maxHeight: "50vh" }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-3 sm:px-6 py-2 sm:py-3 border-b" style={{ borderColor: "#1A1A1A" }}>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold text-[#6C63FF] truncate">
-            📦 {pkg.project_name}
+      <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-zinc-900/50">
+        <div className="min-w-0 flex-1 space-y-1">
+          <span className="text-[10px] font-mono text-zinc-700 tracking-widest uppercase">Package</span>
+          <h2 className="text-sm font-light text-zinc-200 truncate">
+            {pkg.project_name}
           </h2>
-          <p className="text-[11px] text-[#666] mt-0.5 truncate">{pkg.summary}</p>
+          <p className="text-[10px] text-zinc-600 font-mono truncate">{pkg.summary}</p>
         </div>
         <button
           onClick={async () => {
@@ -691,43 +778,37 @@ function PackagePreview({
             a.click();
             URL.revokeObjectURL(url);
           }}
-          className="rounded-lg px-3 py-1.5 text-xs text-[#ccc] transition shrink-0 ml-2"
-          style={{ background: "#1A1A1A", border: "1px solid #2A2A2A" }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "#242424")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "#1A1A1A")}
+          className="border border-zinc-800 px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-zinc-400 hover:bg-zinc-900 hover:text-white transition-all shrink-0 ml-3"
         >
-          ⬇ Download
+          Download
         </button>
       </div>
 
-      {/* File tabs (horizontal scroll on mobile, sidebar on desktop) + preview */}
+      {/* File tabs + preview */}
       <div className="flex flex-col sm:flex-row flex-1 min-h-0">
-        {/* File list — horizontal scroll on mobile, sidebar on desktop */}
-        <div className="sm:w-48 border-b sm:border-b-0 sm:border-r overflow-x-auto sm:overflow-x-visible overflow-y-hidden sm:overflow-y-auto py-1 sm:py-2 flex sm:block shrink-0" style={{ borderColor: "#1A1A1A" }}>
+        <div className="sm:w-48 border-b sm:border-b-0 sm:border-r border-zinc-900/50 overflow-x-auto sm:overflow-x-visible overflow-y-hidden sm:overflow-y-auto py-1 sm:py-2 flex sm:block shrink-0">
           {pkg.files.map((f) => (
             <button
               key={f.path}
               onClick={() => onSelectFile(f)}
-              className={`whitespace-nowrap sm:whitespace-normal sm:w-full text-left px-3 sm:px-4 py-1.5 text-xs transition shrink-0 ${
+              className={`whitespace-nowrap sm:whitespace-normal sm:w-full text-left px-3 sm:px-4 py-1.5 text-[11px] font-mono transition shrink-0 ${
                 previewFile?.path === f.path
-                  ? "text-[#6C63FF]"
-                  : "text-[#666] hover:text-[#aaa]"
+                  ? "text-zinc-200 bg-zinc-900/50"
+                  : "text-zinc-600 hover:text-zinc-400"
               }`}
-              style={previewFile?.path === f.path ? { background: "#1A1A1A" } : {}}
             >
               {f.path}
             </button>
           ))}
         </div>
 
-        {/* Code preview */}
-        <div className="flex-1 overflow-auto min-h-0" style={{ background: "#0D0D0D" }}>
+        <div className="flex-1 overflow-auto min-h-0 bg-[#030303]">
           {previewFile ? (
-            <pre className="p-3 sm:p-4 text-xs leading-relaxed font-mono whitespace-pre overflow-x-auto" style={{ color: "#B0B0B0" }}>
+            <pre className="p-4 text-[11px] leading-relaxed font-mono whitespace-pre overflow-x-auto text-zinc-500">
               {previewFile.content}
             </pre>
           ) : (
-            <div className="flex items-center justify-center h-full text-[#444] text-sm py-8">
+            <div className="flex items-center justify-center h-full text-zinc-800 text-[10px] font-mono uppercase tracking-widest py-8">
               Select a file to preview
             </div>
           )}

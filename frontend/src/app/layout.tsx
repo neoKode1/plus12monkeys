@@ -1,22 +1,18 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { Barlow_Condensed } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import AuthProvider from "@/components/AuthProvider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  weight: ["100", "200", "300", "400", "500", "600"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains",
   subsets: ["latin"],
-});
-
-const barlowCondensed = Barlow_Condensed({
-  variable: "--font-brand",
-  subsets: ["latin"],
-  weight: ["300", "400"],
+  weight: ["100", "300", "400"],
 });
 
 export const metadata: Metadata = {
@@ -34,12 +30,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark scroll-smooth">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${barlowCondensed.variable} antialiased`}
-        style={{ background: "#0D0D0D", color: "#E8E8E8" }}
+        className={`${inter.variable} ${jetbrainsMono.variable} antialiased text-zinc-400 selection:bg-zinc-700 selection:text-white`}
+        style={{ background: "#030303" }}
       >
-        {children}
+        <div className="noise-overlay" />
+        <div className="vignette" />
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

@@ -39,6 +39,10 @@ class AgentRole(BaseModel):
     goal: str
     backstory: Optional[str] = None
     tools: List[str] = Field(default_factory=list)
+    prompt_pattern_ids: List[str] = Field(
+        default_factory=list,
+        description="IDs from prompt_patterns registry to inject into this agent's system prompt",
+    )
 
 
 class MCPServerConfig(BaseModel):

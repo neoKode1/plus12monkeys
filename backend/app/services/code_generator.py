@@ -28,6 +28,7 @@ from app.models.template import (
     GenerateRequest,
     MCPServerConfig,
 )
+from app.services.prompt_patterns import compose_system_prompt_block
 from app.services.template_registry import get_template
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,17 @@ def _build_context(
     """Build the Jinja2 rendering context from template + request."""
     agents = req.agents if req.agents else template.agents
     mcp_servers = req.mcp_servers if req.mcp_servers else template.mcp_servers
+
+    # Resolve prompt patterns for each agent (if any are configured)
+    agent_dicts: List[Dict[str, Any]] = []
+    for a in agents:
+        d = a.model_dump()
+        if a.prompt_pattern_ids:
+            d["guidelines"] = compose_system_prompt_block(a.prompt_pattern_ids)
+        else:
+            d["guidelines"] = ""
+        agent_dicts.append(d)
+
     ctx = {
         "project_name": req.project_name,
         "framework": template.framework.value,
@@ -63,7 +75,7 @@ def _build_context(
         "category": template.category.value,
         "template_name": template.name,
         "template_description": template.description,
-        "agents": [a.model_dump() for a in agents],
+        "agents": agent_dicts,
         "mcp_servers": [s.model_dump() for s in mcp_servers],
         "config": req.config,
         "env_vars": _collect_env_vars(mcp_servers),

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import DOMPurify from "isomorphic-dompurify";
 import JSZip from "jszip";
 import {
@@ -330,7 +331,7 @@ export default function ChatWizard() {
       <header className="border-b border-zinc-900/50 shrink-0 bg-[#030303]/80 backdrop-blur-sm z-30">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
           {/* Left: brand */}
-          <div className="flex items-center gap-2.5 min-w-0">
+          <Link href="/" className="flex items-center gap-2.5 min-w-0 hover:opacity-80 transition">
             <Image
               src="/favicon-monkey.png"
               alt="+12 Monkeys"
@@ -344,7 +345,7 @@ export default function ChatWizard() {
               </span>
               <div className="h-px w-8 bg-zinc-800 mt-1" />
             </div>
-          </div>
+          </Link>
 
           {/* Center: stepper — hidden on mobile */}
           <div className="hidden md:block">

@@ -48,7 +48,7 @@ async def verify(body: VerifyRequest, response: Response):
         value=jwt_token,
         httponly=True,
         secure=True,
-        samesite="lax",
+        samesite="none",
         max_age=_COOKIE_MAX_AGE,
         path="/",
     )
@@ -84,6 +84,6 @@ async def me(request: Request):
 @router.post("/logout")
 async def logout(response: Response):
     """Clear the session cookie."""
-    response.delete_cookie(key=_COOKIE, path="/")
+    response.delete_cookie(key=_COOKIE, path="/", samesite="none", secure=True)
     return {"ok": True}
 

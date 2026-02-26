@@ -107,26 +107,37 @@ async def send_magic_email(email: str, token: str) -> None:
 
 
 def _build_email_html(verify_url: str) -> str:
-    return f"""
-    <div style="background:#030303;padding:48px 24px;font-family:'Courier New',monospace;text-align:center;">
-      <div style="max-width:420px;margin:0 auto;">
-        <p style="color:#a1a1aa;font-size:10px;letter-spacing:0.3em;text-transform:uppercase;margin-bottom:32px;">
-          +12 MONKEYS
-        </p>
-        <p style="color:#d4d4d8;font-size:16px;margin-bottom:32px;">
-          Here's your key.
-        </p>
-        <a href="{verify_url}"
-           style="display:inline-block;padding:14px 40px;border:1px solid #3f3f46;color:#e4e4e7;
-                  text-decoration:none;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;
-                  font-family:'Courier New',monospace;">
-          ENTER →
-        </a>
-        <p style="color:#52525b;font-size:10px;margin-top:32px;letter-spacing:0.1em;">
-          Expires in {settings.magic_link_expire_minutes} minutes.<br/>
-          If you didn't request this, ignore this transmission.
-        </p>
-      </div>
-    </div>
-    """
+    return f"""\
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="420" cellpadding="0" cellspacing="0" style="background-color:#18181b;border-radius:8px;padding:40px 32px;">
+        <tr><td align="center" style="padding-bottom:24px;">
+          <span style="color:#a1a1aa;font-size:11px;letter-spacing:3px;text-transform:uppercase;font-family:monospace;">+12 MONKEYS</span>
+        </td></tr>
+        <tr><td align="center" style="padding-bottom:32px;">
+          <span style="color:#e4e4e7;font-size:18px;">Here's your key.</span>
+        </td></tr>
+        <tr><td align="center" style="padding-bottom:32px;">
+          <a href="{verify_url}"
+             style="display:inline-block;padding:14px 40px;background-color:#3b82f6;color:#ffffff;
+                    text-decoration:none;font-size:13px;letter-spacing:2px;text-transform:uppercase;
+                    font-family:monospace;border-radius:4px;font-weight:bold;">
+            ENTER &rarr;
+          </a>
+        </td></tr>
+        <tr><td align="center">
+          <span style="color:#71717a;font-size:11px;line-height:1.6;">
+            Expires in {settings.magic_link_expire_minutes} minutes.<br/>
+            If you didn't request this, ignore this transmission.
+          </span>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
 

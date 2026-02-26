@@ -1,21 +1,58 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Component, Suspense, useEffect, useState, ReactNode } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { verifyToken } from "@/lib/auth";
 import { useAuth } from "@/components/AuthProvider";
 
+/* ── Error Boundary ─────────────────────────────── */
+class VerifyErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: string }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: "" };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error: error.message };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-[#030303] px-6">
+          <Link href="/" className="flex items-center gap-3 mb-16 hover:opacity-80 transition">
+            <Image src="/favicon-monkey.png" alt="+12 Monkeys" width={40} height={40} className="brightness-0 invert opacity-80" />
+            <span className="text-[11px] font-mono tracking-[0.3em] text-zinc-300 uppercase font-bold">+12 Monkeys</span>
+          </Link>
+          <div className="w-full max-w-sm border border-zinc-800 bg-[#050505] p-8 text-center space-y-4">
+            <p className="text-[10px] font-mono text-red-800 uppercase tracking-widest">Something went wrong</p>
+            <p className="text-sm text-zinc-500 font-light">{this.state.error}</p>
+            <Link href="/sign-in" className="inline-block mt-4 border border-zinc-800 px-6 py-2 text-[10px] font-mono uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all">
+              Request New Key →
+            </Link>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/* ── Page ────────────────────────────────────────── */
 export default function VerifyPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-[#030303]">
-        <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest animate-pulse">Loading...</p>
-      </div>
-    }>
-      <VerifyContent />
-    </Suspense>
+    <VerifyErrorBoundary>
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#030303]">
+          <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest animate-pulse">Loading...</p>
+        </div>
+      }>
+        <VerifyContent />
+      </Suspense>
+    </VerifyErrorBoundary>
   );
 }
 
@@ -37,13 +74,12 @@ function VerifyContent() {
     verifyToken(token)
       .then(async () => {
         setStatus("success");
-        await refresh();
-        // Redirect to homepage after short delay
+        try { await refresh(); } catch { /* ignore refresh errors */ }
         setTimeout(() => router.replace("/"), 1500);
       })
-      .catch(() => {
+      .catch((err) => {
         setStatus("error");
-        setErrorMsg("Invalid or expired key.");
+        setErrorMsg(err?.message || "Invalid or expired key.");
       });
   }, [searchParams, router, refresh]);
 
@@ -64,11 +100,9 @@ function VerifyContent() {
 
       <div className="w-full max-w-sm border border-zinc-800 bg-[#050505] p-8 text-center space-y-4">
         {status === "verifying" && (
-          <>
-            <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest animate-pulse">
-              Verifying key...
-            </p>
-          </>
+          <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest animate-pulse">
+            Verifying key...
+          </p>
         )}
 
         {status === "success" && (

@@ -105,6 +105,11 @@ async def increment_usage(request: Request):
     plan = user.get("plan", "free")
     usage_count = user.get("usage_count", 0)
 
+    # Admin users: unlimited, no usage tracking
+    admin_list = [e.strip().lower() for e in settings.admin_emails.split(",") if e.strip()]
+    if email.lower() in admin_list:
+        return {"allowed": True, "usage_count": usage_count, "plan": "admin"}
+
     # Pro users: unlimited
     if plan == "pro":
         await db.users.update_one(

@@ -65,13 +65,16 @@ async def me(request: Request):
     if not payload:
         raise HTTPException(status_code=401, detail="Session expired.")
     from app.core.database import get_db
+    from app.core.config import settings
     db = get_db()
     user = await db.users.find_one({"email": payload["sub"]})
     if not user:
         raise HTTPException(status_code=401, detail="User not found.")
+    admin_list = [e.strip().lower() for e in settings.admin_emails.split(",") if e.strip()]
     return MeResponse(
         email=user["email"],
         created_at=user["created_at"],
+        is_admin=user["email"].lower() in admin_list,
         usage_count=user.get("usage_count", 0),
         plan=user.get("plan", "free"),
         subscription_expires_at=user.get("subscription_expires_at"),

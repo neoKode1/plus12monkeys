@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     auth_from_email: str = "keys@plus12monkeys.com"
     frontend_url: str = "https://plus12monkeys.com"
 
+    # Admin — comma-separated list of admin emails
+    admin_emails: str = "1deeptechnology@gmail.com"
+
     # Stripe
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""

@@ -31,6 +31,7 @@ class VerifyResponse(BaseModel):
 class MeResponse(BaseModel):
     email: str
     created_at: datetime
+    is_admin: bool = False
     usage_count: int = 0
     plan: str = "free"  # "free" or "pro"
     subscription_expires_at: datetime | None = None

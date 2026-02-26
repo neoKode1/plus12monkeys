@@ -156,7 +156,7 @@ export default function SignInPage() {
         <Waveform />
 
         {/* Form Card */}
-        <div className="w-full max-w-[400px] p-8 border border-white/10 bg-black/40 backdrop-blur-sm relative overflow-hidden">
+        <div className="w-full max-w-[400px] p-8 border border-white/10 bg-black/40 backdrop-blur-sm relative overflow-hidden rounded-sm">
           {/* Scan line inside form */}
           <div
             className="absolute left-0 w-full h-px opacity-20 pointer-events-none"
@@ -195,14 +195,14 @@ export default function SignInPage() {
                   placeholder="USER@DOMAIN.COM"
                   required
                   autoFocus
-                  className="w-full bg-transparent border border-[#555] p-3 text-[11px] focus:outline-none focus:border-[#00FF41] text-[#EAEAEA] transition-colors tracking-widest uppercase placeholder:normal-case placeholder:text-[#333]"
+                  className="w-full bg-transparent border border-[#555] p-3 text-[11px] focus:outline-none focus:border-[#00FF41] text-[#EAEAEA] transition-colors tracking-widest uppercase placeholder:normal-case placeholder:text-[#333] rounded-sm"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading || !email.trim()}
-                className="group relative w-full border border-[#00FF41] py-4 mt-4 overflow-hidden transition-all hover:bg-[#00FF41]/10 disabled:opacity-30 disabled:cursor-not-allowed disabled:border-[#333]"
+                className="group relative w-full border border-[#00FF41] py-4 mt-4 overflow-hidden transition-all hover:bg-[#00FF41]/10 disabled:opacity-30 disabled:cursor-not-allowed disabled:border-[#333] rounded-sm"
               >
                 <span className="relative z-10 text-[10px] tracking-[0.3em] text-[#00FF41] group-hover:text-white transition-colors">
                   {loading ? "TRANSMITTING..." : "TRANSMIT_KEY →"}
@@ -235,7 +235,7 @@ export default function SignInPage() {
 
               <button
                 onClick={() => { setSent(false); setEmail(""); }}
-                className="mt-4 border border-[#555] px-6 py-2 text-[9px] uppercase tracking-[0.2em] text-[#555] hover:text-[#00FF41] hover:border-[#00FF41] transition-colors"
+                className="mt-4 border border-[#555] px-6 py-2 text-[9px] uppercase tracking-[0.2em] text-[#555] hover:text-[#00FF41] hover:border-[#00FF41] transition-colors rounded-sm"
               >
                 Retry_Transmission
               </button>

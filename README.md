@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/public/12monkey%20logo1-modified.png" alt="+12 Monkeys" width="400" />
+  <img src="frontend/public/12m.png" alt="+12 Monkeys" width="600" />
 </p>
 
 # +12 Monkeys

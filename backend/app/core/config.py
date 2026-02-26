@@ -25,6 +25,19 @@ class Settings(BaseSettings):
     session_ttl_minutes: int = 1440  # 24 hours
     session_max_count: int = 500     # evict oldest when exceeded
 
+    # MongoDB
+    mongodb_url: str = ""
+    mongodb_db: str = "twelve_monkeys"
+
+    # Auth
+    resend_api_key: str = ""
+    jwt_secret: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_hours: int = 72  # 3 days
+    magic_link_expire_minutes: int = 15
+    auth_from_email: str = "keys@plus12monkeys.com"
+    frontend_url: str = "https://plus12monkeys.com"
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8000

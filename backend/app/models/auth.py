@@ -31,6 +31,9 @@ class VerifyResponse(BaseModel):
 class MeResponse(BaseModel):
     email: str
     created_at: datetime
+    usage_count: int = 0
+    plan: str = "free"  # "free" or "pro"
+    subscription_expires_at: datetime | None = None
 
 
 # ── MongoDB document shapes (not exposed directly) ──
@@ -41,6 +44,10 @@ class UserDoc(BaseModel):
     email: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: datetime | None = None
+    usage_count: int = 0
+    plan: str = "free"
+    stripe_customer_id: str | None = None
+    subscription_expires_at: datetime | None = None
 
 
 class MagicTokenDoc(BaseModel):

@@ -16,6 +16,7 @@ dependencies = [
     "motor>=3.6.0",
     "pyjwt>=2.9.0",
     "resend>=2.0.0",
+    "stripe>=8.0.0",
 ]
 
 [project.optional-dependencies]

@@ -69,7 +69,13 @@ async def me(request: Request):
     user = await db.users.find_one({"email": payload["sub"]})
     if not user:
         raise HTTPException(status_code=401, detail="User not found.")
-    return MeResponse(email=user["email"], created_at=user["created_at"])
+    return MeResponse(
+        email=user["email"],
+        created_at=user["created_at"],
+        usage_count=user.get("usage_count", 0),
+        plan=user.get("plan", "free"),
+        subscription_expires_at=user.get("subscription_expires_at"),
+    )
 
 
 @router.post("/logout")

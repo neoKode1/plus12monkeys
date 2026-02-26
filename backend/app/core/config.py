@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     auth_from_email: str = "keys@plus12monkeys.com"
     frontend_url: str = "https://plus12monkeys.com"
 
+    # Stripe
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_id: str = "price_1T5BZ0AwlxbzciUiqk8NALPG"
+    free_usage_limit: int = 10
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8000

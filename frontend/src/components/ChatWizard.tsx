@@ -13,6 +13,7 @@ import {
   sendMessageStream,
   StreamEvent,
 } from "@/lib/api";
+import { recordUsage, createCheckout, getBillingStatus, BillingStatus } from "@/lib/auth";
 
 
 interface DisplayMessage {
@@ -202,12 +203,20 @@ export default function ChatWizard() {
   const [typingIdx, setTypingIdx] = useState<number | null>(null);
   const [streamingIdx, setStreamingIdx] = useState<number | null>(null);
   const [toolStatus, setToolStatus] = useState<string | null>(null);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [billingInfo, setBillingInfo] = useState<BillingStatus | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  // Fetch billing status on mount
+  useEffect(() => {
+    getBillingStatus().then(setBillingInfo);
+  }, []);
 
   useEffect(() => {
     setMessages([
@@ -230,9 +239,27 @@ export default function ChatWizard() {
     /https?:\/\/(github\.com|huggingface\.co)\/[^\s]+/.test(text) ||
     /git@github\.com:[^\s]+/.test(text);
 
+  const handleUpgrade = useCallback(async () => {
+    setCheckoutLoading(true);
+    const url = await createCheckout();
+    setCheckoutLoading(false);
+    if (url) window.location.href = url;
+  }, []);
+
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text || loading) return;
+
+    // Check usage before allowing interaction
+    const usage = await recordUsage();
+    if (usage && !usage.allowed) {
+      setBillingInfo((prev) => prev ? { ...prev, needs_upgrade: true, usage_count: usage.usage_count } : prev);
+      setShowPaywall(true);
+      return;
+    }
+    if (usage) {
+      setBillingInfo((prev) => prev ? { ...prev, usage_count: usage.usage_count } : prev);
+    }
 
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: text }]);
@@ -514,6 +541,72 @@ export default function ChatWizard() {
           </button>
         </form>
       </div>
+
+      {/* ══════════ Usage Counter ══════════ */}
+      {billingInfo && billingInfo.plan === "free" && (
+        <div className="absolute top-3 right-4 z-30 flex items-center gap-2">
+          <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-700">
+            {billingInfo.usage_count}/{billingInfo.free_limit} free
+          </span>
+          <button
+            onClick={handleUpgrade}
+            className="text-[9px] font-mono uppercase tracking-widest text-[#00FF41] hover:text-[#00CC33] transition"
+          >
+            Go Pro →
+          </button>
+        </div>
+      )}
+      {billingInfo && billingInfo.plan === "pro" && (
+        <div className="absolute top-3 right-4 z-30 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#00FF41]" />
+          <span className="text-[9px] font-mono uppercase tracking-widest text-[#00FF41]">PRO</span>
+        </div>
+      )}
+
+      {/* ══════════ Paywall Modal ══════════ */}
+      {showPaywall && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="border border-zinc-800 bg-[#050505] p-8 max-w-md w-full mx-4 space-y-6">
+            <div className="space-y-2 text-center">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-700">FREE LIMIT REACHED</div>
+              <h2 className="text-lg font-light text-zinc-200">Upgrade to Pro</h2>
+              <p className="text-xs text-zinc-500 leading-relaxed">
+                You&apos;ve used all {billingInfo?.free_limit} free interactions.
+                Unlock unlimited access for just <strong className="text-zinc-300">$10/year</strong>.
+              </p>
+            </div>
+            <div className="border border-zinc-800 bg-[#030303] p-4 space-y-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-zinc-500 font-mono">Plan</span>
+                <span className="text-zinc-300">+12 Monkeys Pro</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-zinc-500 font-mono">Price</span>
+                <span className="text-zinc-300">$10 / year</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-zinc-500 font-mono">Access</span>
+                <span className="text-zinc-300">Unlimited</span>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowPaywall(false)}
+                className="flex-1 border border-zinc-800 py-3 text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:bg-zinc-900 transition"
+              >
+                Maybe Later
+              </button>
+              <button
+                onClick={handleUpgrade}
+                disabled={checkoutLoading}
+                className="flex-1 bg-[#00FF41] py-3 text-[10px] font-mono uppercase tracking-widest text-black hover:bg-[#00CC33] transition disabled:opacity-50"
+              >
+                {checkoutLoading ? "Loading…" : "Go Pro →"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

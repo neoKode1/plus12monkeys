@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import DOMPurify from "isomorphic-dompurify";
+import { useAuth } from "@/components/AuthProvider";
 import JSZip from "jszip";
 import {
   confirmAndGenerate,
@@ -188,6 +189,7 @@ function ProgressStepper({ status }: { status: string }) {
 }
 
 export default function ChatWizard() {
+  const { logout } = useAuth();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | undefined>();
@@ -391,6 +393,9 @@ export default function ChatWizard() {
                 </button>
               ))}
             </div>
+            <button onClick={logout} className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-red-400 transition-colors cursor-pointer">
+              Sign Out
+            </button>
             <div className="flex items-center gap-2 ml-2">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-900 animate-pulse border border-emerald-500/30" />
               <span className="text-[9px] uppercase tracking-widest text-zinc-700 font-mono hidden sm:inline">Active</span>

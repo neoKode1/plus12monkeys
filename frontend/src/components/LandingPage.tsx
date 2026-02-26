@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 
 export default function LandingPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
 
   return (
     <div className="relative text-zinc-400 antialiased">
@@ -36,7 +36,10 @@ export default function LandingPage() {
             <Link href="/mcp" className="hover:text-zinc-200 transition-colors">MCP</Link>
             {!loading && (
               user ? (
-                <Link href="/wizard" className="text-emerald-600 hover:text-emerald-400 transition-colors">Wizard</Link>
+                <>
+                  <Link href="/wizard" className="text-emerald-600 hover:text-emerald-400 transition-colors">Wizard</Link>
+                  <button onClick={logout} className="hover:text-red-400 transition-colors cursor-pointer">Sign Out</button>
+                </>
               ) : (
                 <Link href="/sign-in" className="hover:text-zinc-200 transition-colors">Sign In</Link>
               )

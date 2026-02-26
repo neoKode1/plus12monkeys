@@ -2,8 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function LandingPage() {
+  const { user, loading } = useAuth();
+
   return (
     <div className="relative text-zinc-400 antialiased">
       {/* Navigation */}
@@ -31,10 +34,26 @@ export default function LandingPage() {
             <a href="#platform" className="hover:text-zinc-200 transition-colors">Platform</a>
             <a href="#capabilities" className="hover:text-zinc-200 transition-colors">Capabilities</a>
             <Link href="/mcp" className="hover:text-zinc-200 transition-colors">MCP</Link>
+            {!loading && (
+              user ? (
+                <Link href="/wizard" className="text-emerald-600 hover:text-emerald-400 transition-colors">Wizard</Link>
+              ) : (
+                <Link href="/sign-in" className="hover:text-zinc-200 transition-colors">Sign In</Link>
+              )
+            )}
           </div>
           <div className="flex items-center gap-2 mt-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-900 animate-pulse border border-emerald-500/30" />
-            <span className="text-[9px] uppercase tracking-widest text-zinc-600">System Active</span>
+            {user ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse border border-emerald-400/30" />
+                <span className="text-[9px] uppercase tracking-widest text-emerald-700">{user.email.split("@")[0]} — Authorized</span>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-900 animate-pulse border border-emerald-500/30" />
+                <span className="text-[9px] uppercase tracking-widest text-zinc-600">System Active</span>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -83,12 +102,12 @@ export default function LandingPage() {
 
             <div className="pt-12 reveal-text" style={{ animationDelay: "0.8s" }}>
               <Link
-                href="/wizard"
+                href={user ? "/wizard" : "/sign-in"}
                 className="group relative inline-flex flex-col items-center justify-center overflow-hidden px-8 py-4 transition-all hover:bg-zinc-900 border border-zinc-800"
               >
                 <span className="absolute inset-0 w-full h-full -mt-10 transition-all duration-700 transform opacity-0 group-hover:translate-y-0 group-hover:opacity-100 bg-zinc-900" />
                 <span className="relative text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-300 group-hover:text-white">
-                  Launch Agent Wizard
+                  {user ? "Launch Agent Wizard" : "Sign In to Launch →"}
                 </span>
               </Link>
               <p className="mt-4 text-[9px] uppercase tracking-widest text-zinc-800">
@@ -364,11 +383,11 @@ export default function LandingPage() {
             </h3>
             <div className="pt-4">
               <Link
-                href="/wizard"
+                href={user ? "/wizard" : "/sign-in"}
                 className="group relative inline-flex items-center justify-center overflow-hidden px-10 py-4 transition-all hover:bg-zinc-900 border border-zinc-800"
               >
                 <span className="relative text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-300 group-hover:text-white">
-                  Launch Wizard →
+                  {user ? "Launch Wizard →" : "Sign In to Launch →"}
                 </span>
               </Link>
             </div>

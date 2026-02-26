@@ -43,7 +43,7 @@ async function apiFetch(
     const timer = setTimeout(() => controller.abort(), timeout);
 
     try {
-      const res = await fetch(input, { ...fetchInit, signal: controller.signal });
+      const res = await fetch(input, { ...fetchInit, signal: controller.signal, credentials: "include" });
       clearTimeout(timer);
 
       if (res.ok) return res;

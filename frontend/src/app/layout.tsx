@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import AuthProvider from "@/components/AuthProvider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -36,7 +37,7 @@ export default function RootLayout({
       >
         <div className="noise-overlay" />
         <div className="vignette" />
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

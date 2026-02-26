@@ -1,39 +1,58 @@
 <p align="center">
-  <img src="frontend/public/12m.png" alt="+12 Monkeys" width="600" />
+  <img src="https://raw.githubusercontent.com/neoKode1/plus12monkeys/main/frontend/public/12m.png" alt="+12 Monkeys" width="600" />
 </p>
 
-# +12 Monkeys
+<h1 align="center">+12 Monkeys</h1>
 
-**Agent-as-a-Service Platform with MCP Integration**
+<p align="center"><strong>Agent-as-a-Service Platform with MCP Integration</strong></p>
 
-> Build and deploy custom AI agents in under 10 minutes through conversational configuration.
+<p align="center">
+  <em>Build and deploy custom AI agents in under 10 minutes through conversational configuration.</em>
+</p>
 
-[![Status](https://img.shields.io/badge/status-active-green)]()
-[![License](https://img.shields.io/badge/license-MIT-green)]()
-[![MCP](https://img.shields.io/badge/MCP-compatible-purple)]()
+<p align="center">
+  <a href="https://plus12monkeys.com"><img src="https://img.shields.io/badge/site-plus12monkeys.com-black?style=for-the-badge" alt="Website" /></a>&nbsp;
+  <img src="https://img.shields.io/badge/status-active-brightgreen?style=for-the-badge" alt="Status" />&nbsp;
+  <img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="License" />&nbsp;
+  <img src="https://img.shields.io/badge/MCP-compatible-8B5CF6?style=for-the-badge" alt="MCP" />
+</p>
 
 ---
 
-## 🎯 What is +12 Monkeys?
+## What is +12 Monkeys?
 
-+12 Monkeys is a **plug-and-play platform** that enables developers to create, configure, and deploy production-ready AI agent systems without writing code. Simply describe what you need in natural language, and the platform generates a **complete deployable package** — Python or TypeScript — ready to deploy with `docker compose up`, Railway, Render, or Vercel.
++12 Monkeys is a **plug-and-play platform** that enables developers to create, configure, and deploy production-ready AI agent systems without writing code. Simply describe what you need in natural language, and the platform generates a **complete deployable package** — Python, TypeScript, Rust, or Go — ready to deploy with `docker compose up`, Railway, Render, or Vercel.
+
+---
 
 ### Key Features
 
-✨ **Conversational Configuration** - No code required, just chat
-🔌 **MCP-Native** - Built on Model Context Protocol (Linux Foundation standard)
-🎨 **20 Agent Templates** - Customer service, research, data analysis, code gen, multi-agent teams, sales & lead gen, content creation, e-commerce, operations, healthcare, real estate, education, STEM lab sim, STEM coding tutor, grant writing, literature review, portfolio risk, compliance & fraud, mission planning, clinical decision support
-🚀 **Three Deployment Options** - LOCAL (docker compose), CLOUD (Railway/Render/Vercel), EXPORT (self-host)
-🔧 **Multi-Framework Support** - LangGraph, CrewAI, AutoGen, Semantic Kernel (Python) + Vercel AI SDK (TypeScript) + Rig (Rust) + ADK-Go (Go)
-🐍 **Python Packages** - agent.py, requirements.txt, Dockerfile (Python 3.12), docker-compose.yml
-📘 **TypeScript Packages** - agent.ts, package.json, tsconfig.json, Dockerfile (Node 22), docker-compose.yml
-🦀 **Rust Packages** - src/main.rs, Cargo.toml, Dockerfile (multi-stage Rust 1.84), docker-compose.yml
-🐹 **Go Packages** - main.go, go.mod, Dockerfile (multi-stage Go 1.23 → distroless), docker-compose.yml
-☁️ **Cloud Deploy Configs** - railway.toml, render.yaml, vercel.json (auto-generated for CLOUD/EXPORT)
-☸️ **Kubernetes Manifests** - k8s/deployment.yaml, k8s/service.yaml (auto-generated for CLOUD/EXPORT)
-⚡ **AWS SAM Templates** - sam/template.yaml with Lambda + API Gateway (auto-generated for CLOUD/EXPORT)
-📋 **Copy-to-Clipboard UI** - Easy code extraction with visual feedback
-⚡ **30-Second Deployment** - From generation to running agent in half a minute
+| | Feature | Description |
+|---|---|---|
+| 💬 | **Conversational Config** | No code required — just describe what you need in plain English |
+| 🔌 | **MCP-Native** | Built on Model Context Protocol (Linux Foundation standard) |
+| 🎨 | **20 Agent Templates** | Customer service, research, data analysis, code gen, multi-agent teams, and 15 more |
+| 🚀 | **3 Deploy Targets** | LOCAL (Docker Compose) · CLOUD (Railway / Render / Vercel) · EXPORT (self-host) |
+| 🔧 | **Multi-Framework** | LangGraph · CrewAI · AutoGen · Semantic Kernel · Vercel AI SDK · Rig · ADK-Go |
+
+### Supported Languages
+
+| | Language | Output |
+|---|---|---|
+| 🐍 | **Python** | `agent.py` · `requirements.txt` · `Dockerfile` (3.12) · `docker-compose.yml` |
+| 📘 | **TypeScript** | `agent.ts` · `package.json` · `tsconfig.json` · `Dockerfile` (Node 22) |
+| 🦀 | **Rust** | `src/main.rs` · `Cargo.toml` · multi-stage `Dockerfile` (1.84) |
+| 🐹 | **Go** | `main.go` · `go.mod` · multi-stage `Dockerfile` (1.23 → distroless) |
+
+### Infrastructure & DevOps
+
+| | Config | Details |
+|---|---|---|
+| ☁️ | **Cloud Configs** | `railway.toml` · `render.yaml` · `vercel.json` |
+| ☸️ | **Kubernetes** | `k8s/deployment.yaml` · `k8s/service.yaml` |
+| ⚡ | **AWS SAM** | `sam/template.yaml` — Lambda + API Gateway |
+| 📋 | **Copy-to-Clipboard** | One-click code extraction with visual feedback |
+| ⏱️ | **30-Second Deploy** | From generation to running agent in half a minute |
 
 ---
 
@@ -587,10 +606,6 @@ docker compose up --build
 ---
 
 ## 📚 Documentation
-
-- **[SPRINT_PLAN.md](./SPRINT_PLAN.md)** - Complete development plan (14 weeks, 6 phases)
-- **[QUICK_REFERENCE.md](./QUICK_REFERENCE.md)** - Quick reference guide
-- **[nanda-index/README.md](./nanda-index/README.md)** - NANDA Index documentation
 
 ### External Resources
 

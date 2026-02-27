@@ -1,6 +1,7 @@
 /** Auth API client for +12 Monkeys magic-link auth. */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Use relative URLs so requests go through Next.js rewrites (same-origin cookies)
+const API_BASE = "";
 
 export interface AuthUser {
   email: string;

@@ -173,6 +173,28 @@ async def create_single_use_checkout(request: Request):
     return {"url": session.url}
 
 
+@router.post("/portal")
+async def create_portal_session(request: Request):
+    """Create a Stripe Customer Portal session for subscription management."""
+    email = _get_user_email(request)
+    s = _get_stripe()
+    db = get_db()
+
+    user = await db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    customer_id = user.get("stripe_customer_id")
+    if not customer_id:
+        raise HTTPException(status_code=400, detail="No billing account found.")
+
+    session = s.billing_portal.Session.create(
+        customer=customer_id,
+        return_url=f"{settings.frontend_url}/wizard",
+    )
+    return {"url": session.url}
+
+
 @router.post("/sync-usage")
 async def sync_anonymous_usage(request: Request):
     """Transfer anonymous usage count to the authenticated user's record."""

@@ -615,9 +615,24 @@ export default function ChatWizard() {
         </div>
       )}
       {user && billingInfo && billingInfo.plan === "pro" && (
-        <div className="absolute top-3 right-4 z-30 flex items-center gap-1.5">
+        <div className="absolute top-3 right-4 z-30 flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-[#00FF41]" />
           <span className="text-[9px] font-mono uppercase tracking-widest text-[#00FF41]">PRO</span>
+          <button
+            onClick={async () => {
+              try {
+                const res = await fetch("/api/v1/billing/portal", {
+                  method: "POST",
+                  credentials: "include",
+                });
+                const data = await res.json();
+                if (data.url) window.location.href = data.url;
+              } catch {}
+            }}
+            className="text-[9px] font-mono uppercase tracking-widest text-zinc-600 hover:text-zinc-400 ml-2"
+          >
+            Manage
+          </button>
         </div>
       )}
 

@@ -394,8 +394,17 @@ export default function LandingPage() {
                 </span>
               </Link>
             </div>
-            <p className="text-[9px] text-zinc-800 pt-12 uppercase tracking-widest">
-              +12 Monkeys © 2025. MIT License. All Rights Reserved.
+            <div className="flex items-center justify-center gap-4 pt-12">
+              <Link href="/terms" className="text-[9px] text-zinc-700 hover:text-zinc-500 uppercase tracking-widest font-mono">
+                Terms
+              </Link>
+              <span className="text-zinc-800">·</span>
+              <Link href="/privacy" className="text-[9px] text-zinc-700 hover:text-zinc-500 uppercase tracking-widest font-mono">
+                Privacy
+              </Link>
+            </div>
+            <p className="text-[9px] text-zinc-800 pt-4 uppercase tracking-widest">
+              +12 Monkeys © 2025. All Rights Reserved.
             </p>
           </div>
         </section>

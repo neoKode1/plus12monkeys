@@ -4,9 +4,11 @@ import json
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.models.conversation import (
     ChatRequest,
@@ -30,9 +32,12 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/wizard", tags=["wizard"])
 
+limiter = Limiter(key_func=get_remote_address)
+
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(body: ChatRequest):
+@limiter.limit("20/minute")
+async def chat(request: Request, body: ChatRequest):
     """Process a single turn of the wizard conversation.
 
     - If session_id is omitted, a new session is created.
@@ -45,7 +50,8 @@ async def chat(body: ChatRequest):
 
 
 @router.post("/chat/stream")
-async def chat_stream(body: ChatRequest):
+@limiter.limit("20/minute")
+async def chat_stream(request: Request, body: ChatRequest):
     """Streaming version of the chat endpoint.
 
     Returns a Server-Sent Events stream with events:

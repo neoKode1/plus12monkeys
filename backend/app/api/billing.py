@@ -134,7 +134,7 @@ async def increment_usage(request: Request):
         "allowed": True,
         "usage_count": usage_count + 1,
         "plan": "free",
-        "remaining": settings.free_usage_limit - usage_count - 1,
+        "remaining": effective_limit - usage_count - 1,
     }
 
 

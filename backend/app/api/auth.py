@@ -1,6 +1,10 @@
 """+12 Monkeys — Auth endpoints."""
 
+import re
+
 from fastapi import APIRouter, HTTPException, Response, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.models.auth import (
     SendKeyRequest,
@@ -23,10 +27,17 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 _COOKIE = "twelve_monkeys_session"
 _COOKIE_MAX_AGE = 60 * 60 * 72  # 3 days
 
+_EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+
+limiter = Limiter(key_func=get_remote_address)
+
 
 @router.post("/send-key", response_model=SendKeyResponse)
-async def send_key(body: SendKeyRequest):
+@limiter.limit("5/minute")
+async def send_key(request: Request, body: SendKeyRequest):
     """Send a magic-link email. Always returns 200 (no email enumeration)."""
+    if not _EMAIL_RE.match(body.email):
+        return SendKeyResponse()  # fail silently — no enumeration
     try:
         await get_or_create_user(body.email)
         token = await create_magic_token(body.email)
@@ -48,7 +59,7 @@ async def verify(body: VerifyRequest, response: Response):
         value=jwt_token,
         httponly=True,
         secure=True,
-        samesite="none",
+        samesite="lax",
         max_age=_COOKIE_MAX_AGE,
         path="/",
     )
@@ -84,6 +95,6 @@ async def me(request: Request):
 @router.post("/logout")
 async def logout(response: Response):
     """Clear the session cookie."""
-    response.delete_cookie(key=_COOKIE, path="/", samesite="none", secure=True)
+    response.delete_cookie(key=_COOKIE, path="/", samesite="lax", secure=True)
     return {"ok": True}
 

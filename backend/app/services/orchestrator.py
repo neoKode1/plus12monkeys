@@ -241,18 +241,21 @@ REPO-TO-MCP / REPO-TO-SDK — When the user pastes a URL
 
 If the user's message contains a GitHub or HuggingFace URL:
 
-1. Call the analyze_repository tool with the URL.
-2. Acknowledge the repo by name and describe what it does.
-3. Determine intent — does the user want to:
-   a) WRAP this repo as an MCP server?
-   b) BUILD AN AGENT FOR this existing app (integrate into it)?
-   c) GENERATE AN SDK PACKAGE (a reusable library wrapping this repo)?
-   If unclear, ask: "Would you like me to: (1) build an MCP server \
-   wrapping this repo, (2) generate an SDK package you can pip/npm \
-   install, or (3) build an agent designed to integrate INTO this app?"
-   IMPORTANT: If the user explicitly asks for an "SDK", set intent='sdk'.
-4. For MCP WRAPPING (a): Propose an MCP server wrapper.
-5. For SDK PACKAGE (c): Propose a reusable library package.
+1. Read the user's message FIRST to determine their intent BEFORE calling \
+   analyze_repository. Look for keywords:
+   - "SDK", "package", "library", "pip install", "npm install", "import" \
+     → intent='sdk'
+   - "MCP", "server", "wrap", "tools" → intent='wrap'
+   - "integrate", "plug into", "add to my app" → intent='integrate'
+   If unclear, DEFAULT to asking the user (don't just assume 'wrap').
+2. Call the analyze_repository tool with the URL AND the correct intent.
+   You MUST pass the intent parameter — do not omit it.
+3. Acknowledge the repo by name and describe what it does.
+4. If you still aren't sure of intent, ask: "Would you like me to: \
+   (1) generate an SDK package you can pip/npm install, \
+   (2) build an MCP server wrapping this repo, or \
+   (3) build an agent designed to integrate INTO this app?"
+5. For SDK PACKAGE (intent='sdk'): Propose a reusable library package.
    - Python repos → pip-installable package with a typed client class.
    - TypeScript/JS repos → npm package with a typed client class.
    - The SDK wraps the repo's functionality as importable code — \

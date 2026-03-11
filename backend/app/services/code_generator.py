@@ -472,3 +472,143 @@ CMD ["python", "mcp_server.py"]
         setup_instructions=setup,
         env_vars=["ANTHROPIC_API_KEY"],
     )
+
+
+# ---------------------------------------------------------------------------
+# Repo-to-SDK package generation
+# ---------------------------------------------------------------------------
+
+def generate_sdk_package(
+    repo_analysis: Dict[str, Any],
+    project_name: Optional[str] = None,
+    deployment: DeploymentTarget = DeploymentTarget.EXPORT,
+) -> GeneratedPackage:
+    """Generate an SDK package that wraps an external repository.
+
+    Unlike generate_mcp_wrapper (which produces an MCP server), this creates
+    a reusable library/package that can be installed via pip or npm and
+    imported directly into any project.
+
+    Uses repo_analysis (from repo_analyzer) to produce a typed client class
+    that clones and wraps the target repo's functionality.
+    """
+    repo_name = repo_analysis.get("name", "repo")
+    repo_url = repo_analysis.get("url", "")
+    owner = repo_analysis.get("owner", "unknown")
+    repo_name_safe = _safe_name(repo_name)
+    pname = project_name or f"{repo_name}-sdk"
+    primary_lang = repo_analysis.get("primary_language", "python").lower()
+
+    # Determine output language based on repo's primary language
+    is_ts = primary_lang in ("typescript", "javascript")
+
+    ctx = {
+        "project_name": pname,
+        "repo_name": repo_name,
+        "repo_name_safe": repo_name_safe,
+        "repo_url": repo_url,
+        "repo_description": repo_analysis.get("description", f"SDK wrapper for {owner}/{repo_name}"),
+        "primary_language": primary_lang,
+        "detected_framework": repo_analysis.get("detected_framework", ""),
+        "entry_points": repo_analysis.get("entry_points", []),
+        "tree_summary": repo_analysis.get("tree_summary", []),
+        "languages": repo_analysis.get("languages", []),
+    }
+
+    files: List[GeneratedFile] = []
+
+    # 1. SDK client
+    if is_ts:
+        try:
+            files.append(GeneratedFile(
+                path="sdk.ts",
+                content=_render("sdk_wrapper.ts.j2", ctx),
+                language="typescript",
+            ))
+        except TemplateError as exc:
+            logger.error("Failed to render TS SDK wrapper: %s", exc)
+    else:
+        try:
+            files.append(GeneratedFile(
+                path="sdk.py",
+                content=_render("sdk_wrapper.py.j2", ctx),
+                language="python",
+            ))
+        except TemplateError as exc:
+            logger.error("Failed to render Python SDK wrapper: %s", exc)
+
+    # 2. Package config
+    if is_ts:
+        try:
+            files.append(GeneratedFile(
+                path="package.json",
+                content=_render("sdk_package_json.j2", ctx),
+                language="json",
+            ))
+        except TemplateError as exc:
+            logger.warning("Failed to render SDK package.json: %s", exc)
+        try:
+            files.append(GeneratedFile(
+                path="tsconfig.json",
+                content=_render("tsconfig_json.j2", ctx),
+                language="json",
+            ))
+        except TemplateError as exc:
+            logger.warning("Failed to render tsconfig.json: %s", exc)
+    else:
+        try:
+            files.append(GeneratedFile(
+                path="setup.py",
+                content=_render("sdk_setup_py.j2", ctx),
+                language="python",
+            ))
+        except TemplateError as exc:
+            logger.warning("Failed to render SDK setup.py: %s", exc)
+        files.append(GeneratedFile(
+            path="requirements.txt",
+            content="gitpython>=3.1\n",
+            language="text",
+        ))
+
+    # 3. .env.example
+    env_content = f"""# +12 Monkeys SDK Package — {owner}/{repo_name}
+# Add any API keys the wrapped repo needs below
+
+# Override repo clone location (optional)
+# REPO_DIR=./_vendor/{repo_name}
+"""
+    files.append(GeneratedFile(path=".env.example", content=env_content, language="text"))
+
+    # 4. README
+    try:
+        files.append(GeneratedFile(
+            path="README.md",
+            content=_render("sdk_readme.md.j2", ctx),
+            language="markdown",
+        ))
+    except TemplateError as exc:
+        logger.warning("Failed to render SDK README: %s", exc)
+
+    # 5. Setup instructions
+    if is_ts:
+        setup = [
+            "npm install",
+            "npm run build",
+            "Import: import { " + repo_name_safe.title() + "Client } from './sdk'",
+        ]
+    else:
+        setup = [
+            "pip install -e .",
+            "Import: from sdk import " + repo_name_safe.title() + "Client",
+        ]
+
+    return GeneratedPackage(
+        project_name=pname,
+        template_id="repo-sdk-package",
+        framework=FrameworkChoice.VERCEL_AI if is_ts else FrameworkChoice.LANGGRAPH,
+        deployment=deployment,
+        files=files,
+        summary=f"SDK package for {owner}/{repo_name} — importable {('TypeScript' if is_ts else 'Python')} client wrapping the repo.",
+        setup_instructions=setup,
+        env_vars=[],
+    )

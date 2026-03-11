@@ -1,6 +1,7 @@
 /** Auth API client for +12 Monkeys magic-link auth. */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Use relative URLs so requests go through Next.js rewrites (same-origin cookies)
+const API_BASE = "";
 
 export interface AuthUser {
   email: string;
@@ -111,6 +112,36 @@ export async function createCheckout(): Promise<string | null> {
     return data.url;
   } catch {
     return null;
+  }
+}
+
+/** Create a Stripe Checkout session for a single $1 use. */
+export async function createSingleUseCheckout(): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/billing/single-use-checkout`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.url;
+  } catch {
+    return null;
+  }
+}
+
+/** Transfer anonymous usage count to the authenticated user's record. */
+export async function syncAnonymousUsage(count: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/billing/sync-usage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ anonymous_usage_count: count }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 

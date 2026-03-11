@@ -1,6 +1,7 @@
 /** API client for the +12 Monkeys backend wizard endpoints. */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Use relative URLs so requests go through Next.js rewrites (same-origin cookies)
+const API_BASE = "";
 
 // ---------------------------------------------------------------------------
 // Typed error & fetch helper

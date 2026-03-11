@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "plus12monkeys"
+version = "0.1.0"
+description = "SDK client for +12 Monkeys — generate MCP servers and SDK packages from any GitHub repo"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "DeepTech AI", email = "1deeptechnology@gmail.com"}]
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Code Generators",
+]
+keywords = ["mcp", "sdk", "code-generation", "ai-agents", "12monkeys"]
+
+[project.urls]
+Homepage = "https://plus12monkeys.com"
+Repository = "https://github.com/neoKode1/plus12monkeys"
+
+[tool.setuptools.packages.find]
+include = ["plus12monkeys*"]
+

@@ -101,11 +101,12 @@ TOOLS: List[Dict[str, Any]] = [
                 },
                 "intent": {
                     "type": "string",
-                    "enum": ["wrap", "integrate"],
+                    "enum": ["wrap", "integrate", "sdk"],
                     "description": (
                         "Why the user shared this repo. "
                         "'wrap' = build an MCP server wrapping this repo. "
                         "'integrate' = build an agent designed to plug into this existing app. "
+                        "'sdk' = generate a reusable SDK package (pip/npm) wrapping this repo. "
                         "Default: 'wrap'."
                     ),
                 },

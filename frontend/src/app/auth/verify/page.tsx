@@ -4,7 +4,7 @@ import { Component, Suspense, useEffect, useState, ReactNode } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { verifyToken } from "@/lib/auth";
+import { verifyToken, syncAnonymousUsage } from "@/lib/auth";
 import { useAuth } from "@/components/AuthProvider";
 
 /* ── Error Boundary ─────────────────────────────── */
@@ -75,7 +75,16 @@ function VerifyContent() {
       .then(async () => {
         setStatus("success");
         try { await refresh(); } catch { /* ignore refresh errors */ }
-        setTimeout(() => router.replace("/"), 1500);
+        // Transfer anonymous usage to the user's record
+        const anonKey = "twelve_monkeys_anon_usage";
+        const anonCount = parseInt(localStorage.getItem(anonKey) || "0", 10);
+        if (anonCount > 0) {
+          try {
+            await syncAnonymousUsage(anonCount);
+            localStorage.removeItem(anonKey);
+          } catch { /* ignore sync errors */ }
+        }
+        setTimeout(() => router.replace("/wizard"), 1500);
       })
       .catch((err) => {
         setStatus("error");

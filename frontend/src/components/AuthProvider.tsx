@@ -21,7 +21,7 @@ const AuthContext = createContext<AuthCtx>({
 export const useAuth = () => useContext(AuthContext);
 
 /** Pages that don't require authentication. */
-const PUBLIC_PATHS = new Set(["/", "/sign-in", "/auth/verify"]);
+const PUBLIC_PATHS = new Set(["/", "/sign-in", "/auth/verify", "/wizard", "/billing/success", "/billing/cancel"]);
 
 export default function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);

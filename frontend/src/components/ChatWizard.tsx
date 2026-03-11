@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import DOMPurify from "isomorphic-dompurify";
 import { useAuth } from "@/components/AuthProvider";
 import JSZip from "jszip";
@@ -14,7 +15,7 @@ import {
   sendMessageStream,
   StreamEvent,
 } from "@/lib/api";
-import { recordUsage, createCheckout, getBillingStatus, BillingStatus } from "@/lib/auth";
+import { recordUsage, createCheckout, createSingleUseCheckout, getBillingStatus, BillingStatus } from "@/lib/auth";
 
 
 interface DisplayMessage {
@@ -188,8 +189,21 @@ function ProgressStepper({ status }: { status: string }) {
   );
 }
 
+const ANON_USAGE_KEY = "twelve_monkeys_anon_usage";
+const FREE_LIMIT = 10;
+
+function getAnonUsage(): number {
+  if (typeof window === "undefined") return 0;
+  return parseInt(localStorage.getItem(ANON_USAGE_KEY) || "0", 10);
+}
+function setAnonUsage(count: number) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(ANON_USAGE_KEY, String(count));
+}
+
 export default function ChatWizard() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+  const router = useRouter();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | undefined>();
@@ -206,8 +220,11 @@ export default function ChatWizard() {
   const [streamingIdx, setStreamingIdx] = useState<number | null>(null);
   const [toolStatus, setToolStatus] = useState<string | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showSignInGate, setShowSignInGate] = useState(false);
   const [billingInfo, setBillingInfo] = useState<BillingStatus | null>(null);
+  const [anonUsage, setAnonUsageState] = useState(0);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [singleUseLoading, setSingleUseLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -215,10 +232,14 @@ export default function ChatWizard() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // Fetch billing status on mount
+  // Fetch billing status on mount (only if signed in)
   useEffect(() => {
-    getBillingStatus().then(setBillingInfo);
-  }, []);
+    if (user) {
+      getBillingStatus().then(setBillingInfo);
+    } else {
+      setAnonUsageState(getAnonUsage());
+    }
+  }, [user]);
 
   useEffect(() => {
     setMessages([
@@ -248,19 +269,38 @@ export default function ChatWizard() {
     if (url) window.location.href = url;
   }, []);
 
+  const handleSingleUse = useCallback(async () => {
+    setSingleUseLoading(true);
+    const url = await createSingleUseCheckout();
+    setSingleUseLoading(false);
+    if (url) window.location.href = url;
+  }, []);
+
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text || loading) return;
 
-    // Check usage before allowing interaction
-    const usage = await recordUsage();
-    if (usage && !usage.allowed) {
-      setBillingInfo((prev) => prev ? { ...prev, needs_upgrade: true, usage_count: usage.usage_count } : prev);
-      setShowPaywall(true);
-      return;
-    }
-    if (usage) {
-      setBillingInfo((prev) => prev ? { ...prev, usage_count: usage.usage_count } : prev);
+    if (user) {
+      // Authenticated: check usage via backend
+      const usage = await recordUsage();
+      if (usage && !usage.allowed) {
+        setBillingInfo((prev) => prev ? { ...prev, needs_upgrade: true, usage_count: usage.usage_count } : prev);
+        setShowPaywall(true);
+        return;
+      }
+      if (usage) {
+        setBillingInfo((prev) => prev ? { ...prev, usage_count: usage.usage_count } : prev);
+      }
+    } else {
+      // Anonymous: track via localStorage
+      const currentUsage = getAnonUsage();
+      if (currentUsage >= FREE_LIMIT) {
+        setShowSignInGate(true);
+        return;
+      }
+      const newCount = currentUsage + 1;
+      setAnonUsage(newCount);
+      setAnonUsageState(newCount);
     }
 
     setInput("");
@@ -393,9 +433,15 @@ export default function ChatWizard() {
                 </button>
               ))}
             </div>
-            <button onClick={logout} className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-red-400 transition-colors cursor-pointer">
-              Sign Out
-            </button>
+            {user ? (
+              <button onClick={logout} className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-red-400 transition-colors cursor-pointer">
+                Sign Out
+              </button>
+            ) : (
+              <Link href="/sign-in" className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-[#00FF41] transition-colors">
+                Sign In
+              </Link>
+            )}
             <div className="flex items-center gap-2 ml-2">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-900 animate-pulse border border-emerald-500/30" />
               <span className="text-[9px] uppercase tracking-widest text-zinc-700 font-mono hidden sm:inline">Active</span>
@@ -548,7 +594,7 @@ export default function ChatWizard() {
       </div>
 
       {/* ══════════ Usage Counter ══════════ */}
-      {billingInfo && billingInfo.plan === "free" && (
+      {user && billingInfo && billingInfo.plan === "free" && (
         <div className="absolute top-3 right-4 z-30 flex items-center gap-2">
           <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-700">
             {billingInfo.usage_count}/{billingInfo.free_limit} free
@@ -561,54 +607,121 @@ export default function ChatWizard() {
           </button>
         </div>
       )}
-      {billingInfo && billingInfo.plan === "pro" && (
-        <div className="absolute top-3 right-4 z-30 flex items-center gap-1.5">
+      {!user && (
+        <div className="absolute top-3 right-4 z-30 flex items-center gap-2">
+          <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-700">
+            {anonUsage}/{FREE_LIMIT} free
+          </span>
+        </div>
+      )}
+      {user && billingInfo && billingInfo.plan === "pro" && (
+        <div className="absolute top-3 right-4 z-30 flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-[#00FF41]" />
           <span className="text-[9px] font-mono uppercase tracking-widest text-[#00FF41]">PRO</span>
+          <button
+            onClick={async () => {
+              try {
+                const res = await fetch("/api/v1/billing/portal", {
+                  method: "POST",
+                  credentials: "include",
+                });
+                const data = await res.json();
+                if (data.url) window.location.href = data.url;
+              } catch {}
+            }}
+            className="text-[9px] font-mono uppercase tracking-widest text-zinc-600 hover:text-zinc-400 ml-2"
+          >
+            Manage
+          </button>
         </div>
       )}
 
-      {/* ══════════ Paywall Modal ══════════ */}
-      {showPaywall && (
+      {/* ══════════ Sign-In Gate Modal (anonymous users, 11th use) ══════════ */}
+      {showSignInGate && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <div className="border border-zinc-800 bg-[#050505] p-8 max-w-md w-full mx-4 space-y-6">
             <div className="space-y-2 text-center">
               <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-700">FREE LIMIT REACHED</div>
-              <h2 className="text-lg font-light text-zinc-200">Upgrade to Pro</h2>
+              <h2 className="text-lg font-light text-zinc-200">Sign in to continue</h2>
               <p className="text-xs text-zinc-500 leading-relaxed">
-                You&apos;ve used all {billingInfo?.free_limit} free interactions.
-                Unlock unlimited access for just <strong className="text-zinc-300">$10/year</strong>.
+                You&apos;ve used all {FREE_LIMIT} free interactions.
+                Sign in to unlock payment options and keep building.
               </p>
-            </div>
-            <div className="border border-zinc-800 bg-[#030303] p-4 space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-zinc-500 font-mono">Plan</span>
-                <span className="text-zinc-300">+12 Monkeys Pro</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-zinc-500 font-mono">Price</span>
-                <span className="text-zinc-300">$10 / year</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-zinc-500 font-mono">Access</span>
-                <span className="text-zinc-300">Unlimited</span>
-              </div>
             </div>
             <div className="flex gap-3">
               <button
-                onClick={() => setShowPaywall(false)}
+                onClick={() => setShowSignInGate(false)}
                 className="flex-1 border border-zinc-800 py-3 text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:bg-zinc-900 transition"
               >
                 Maybe Later
               </button>
-              <button
-                onClick={handleUpgrade}
-                disabled={checkoutLoading}
-                className="flex-1 bg-[#00FF41] py-3 text-[10px] font-mono uppercase tracking-widest text-black hover:bg-[#00CC33] transition disabled:opacity-50"
+              <Link
+                href="/sign-in"
+                className="flex-1 bg-[#00FF41] py-3 text-[10px] font-mono uppercase tracking-widest text-black hover:bg-[#00CC33] transition text-center"
               >
-                {checkoutLoading ? "Loading…" : "Go Pro →"}
-              </button>
+                Sign In →
+              </Link>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════ Paywall Modal (signed-in users, dual pricing) ══════════ */}
+      {showPaywall && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="border border-zinc-800 bg-[#050505] p-8 max-w-lg w-full mx-4 space-y-6">
+            <div className="space-y-2 text-center">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-700">FREE LIMIT REACHED</div>
+              <h2 className="text-lg font-light text-zinc-200">Choose your plan</h2>
+              <p className="text-xs text-zinc-500 leading-relaxed">
+                You&apos;ve used all {billingInfo?.free_limit} free interactions. Pick an option below to keep building.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* $10/year option */}
+              <div className="border border-zinc-800 bg-[#030303] p-5 space-y-4 flex flex-col">
+                <div className="space-y-1">
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-[#00FF41]">Best Value</div>
+                  <div className="text-xl font-light text-zinc-200">$10<span className="text-xs text-zinc-500">/year</span></div>
+                </div>
+                <div className="text-[11px] text-zinc-500 space-y-1 flex-1">
+                  <p>✓ Unlimited interactions</p>
+                  <p>✓ All features included</p>
+                  <p>✓ Priority support</p>
+                </div>
+                <button
+                  onClick={handleUpgrade}
+                  disabled={checkoutLoading}
+                  className="w-full bg-[#00FF41] py-3 text-[10px] font-mono uppercase tracking-widest text-black hover:bg-[#00CC33] transition disabled:opacity-50"
+                >
+                  {checkoutLoading ? "Loading…" : "Go Pro →"}
+                </button>
+              </div>
+              {/* $1/use option */}
+              <div className="border border-zinc-800 bg-[#030303] p-5 space-y-4 flex flex-col">
+                <div className="space-y-1">
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-600">Pay as you go</div>
+                  <div className="text-xl font-light text-zinc-200">$1<span className="text-xs text-zinc-500">/use</span></div>
+                </div>
+                <div className="text-[11px] text-zinc-500 space-y-1 flex-1">
+                  <p>✓ One additional interaction</p>
+                  <p>✓ No commitment</p>
+                </div>
+                <button
+                  onClick={handleSingleUse}
+                  disabled={singleUseLoading}
+                  className="w-full border border-zinc-800 py-3 text-[10px] font-mono uppercase tracking-widest text-zinc-400 hover:bg-zinc-900 hover:text-white transition disabled:opacity-50"
+                >
+                  {singleUseLoading ? "Loading…" : "Buy 1 Use →"}
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowPaywall(false)}
+              className="w-full border border-zinc-800 py-2 text-[10px] font-mono uppercase tracking-widest text-zinc-600 hover:bg-zinc-900 transition"
+            >
+              Maybe Later
+            </button>
           </div>
         </div>
       )}

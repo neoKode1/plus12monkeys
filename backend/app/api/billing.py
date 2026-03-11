@@ -84,11 +84,14 @@ async def billing_status(request: Request):
         )
         plan = "free"
 
+    purchased_uses = user.get("purchased_uses", 0)
+    effective_limit = settings.free_usage_limit + purchased_uses
+
     return {
         "usage_count": usage_count,
         "plan": plan,
-        "free_limit": settings.free_usage_limit,
-        "needs_upgrade": plan == "free" and usage_count >= settings.free_usage_limit,
+        "free_limit": effective_limit,
+        "needs_upgrade": plan == "free" and usage_count >= effective_limit,
         "subscription_expires_at": expires.isoformat() if expires else None,
     }
 
@@ -117,10 +120,12 @@ async def increment_usage(request: Request):
         )
         return {"allowed": True, "usage_count": usage_count + 1, "plan": "pro"}
 
-    # Free users: check limit
-    if usage_count >= settings.free_usage_limit:
+    # Free users: check limit (include purchased single uses)
+    purchased_uses = user.get("purchased_uses", 0)
+    effective_limit = settings.free_usage_limit + purchased_uses
+    if usage_count >= effective_limit:
         return {"allowed": False, "usage_count": usage_count, "plan": "free",
-                "message": "Free limit reached. Upgrade to Pro."}
+                "message": "Free limit reached. Upgrade to Pro or buy another use."}
 
     await db.users.update_one(
         {"email": email}, {"$inc": {"usage_count": 1}}
@@ -129,6 +134,88 @@ async def increment_usage(request: Request):
         "allowed": True,
         "usage_count": usage_count + 1,
         "plan": "free",
-        "remaining": settings.free_usage_limit - usage_count - 1,
+        "remaining": effective_limit - usage_count - 1,
     }
+
+
+@router.post("/single-use-checkout")
+async def create_single_use_checkout(request: Request):
+    """Create a Stripe Checkout session for a one-time $1 use."""
+    email = _get_user_email(request)
+    s = _get_stripe()
+    db = get_db()
+
+    if not settings.stripe_single_use_price_id:
+        raise HTTPException(status_code=500, detail="Single-use price not configured.")
+
+    user = await db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    # Get or create Stripe customer
+    customer_id = user.get("stripe_customer_id")
+    if not customer_id:
+        customer = s.Customer.create(email=email)
+        customer_id = customer.id
+        await db.users.update_one(
+            {"email": email},
+            {"$set": {"stripe_customer_id": customer_id}},
+        )
+
+    session = s.checkout.Session.create(
+        customer=customer_id,
+        mode="payment",
+        line_items=[{"price": settings.stripe_single_use_price_id, "quantity": 1}],
+        success_url=f"{settings.frontend_url}/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{settings.frontend_url}/billing/cancel",
+        metadata={"email": email, "type": "single_use"},
+    )
+    return {"url": session.url}
+
+
+@router.post("/portal")
+async def create_portal_session(request: Request):
+    """Create a Stripe Customer Portal session for subscription management."""
+    email = _get_user_email(request)
+    s = _get_stripe()
+    db = get_db()
+
+    user = await db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    customer_id = user.get("stripe_customer_id")
+    if not customer_id:
+        raise HTTPException(status_code=400, detail="No billing account found.")
+
+    session = s.billing_portal.Session.create(
+        customer=customer_id,
+        return_url=f"{settings.frontend_url}/wizard",
+    )
+    return {"url": session.url}
+
+
+@router.post("/sync-usage")
+async def sync_anonymous_usage(request: Request):
+    """Transfer anonymous usage count to the authenticated user's record."""
+    email = _get_user_email(request)
+    db = get_db()
+
+    body = await request.json()
+    anon_count = int(body.get("anonymous_usage_count", 0))
+    if anon_count < 0:
+        anon_count = 0
+
+    user = await db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    current_usage = user.get("usage_count", 0)
+    # Only set if anonymous count is higher (don't decrease)
+    new_count = max(current_usage, anon_count)
+    await db.users.update_one(
+        {"email": email},
+        {"$set": {"usage_count": new_count}},
+    )
+    return {"usage_count": new_count}
 

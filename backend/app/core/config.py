@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
     stripe_price_id: str = "price_1T5BZ0AwlxbzciUiqk8NALPG"
+    stripe_single_use_price_id: str = ""
     free_usage_limit: int = 10
 
     # Server

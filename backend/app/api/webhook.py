@@ -31,8 +31,33 @@ async def stripe_webhook(request: Request):
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
+        session_id = session.get("id")
+
+        # Idempotency check — skip if already processed
+        if session_id:
+            existing = await db.stripe_events.find_one({"session_id": session_id})
+            if existing:
+                return {"received": True}
+            await db.stripe_events.insert_one({
+                "session_id": session_id,
+                "event_type": event["type"],
+                "processed_at": datetime.now(timezone.utc),
+            })
+
         email = session.get("metadata", {}).get("email")
-        if email:
+        payment_type = session.get("metadata", {}).get("type", "")
+
+        if email and payment_type == "single_use":
+            # One-time $1 payment — grant 1 additional use
+            await db.users.update_one(
+                {"email": email},
+                {
+                    "$inc": {"purchased_uses": 1},
+                    "$set": {"stripe_customer_id": session.get("customer")},
+                },
+            )
+        elif email:
+            # Subscription — set plan to pro
             await db.users.update_one(
                 {"email": email},
                 {"$set": {

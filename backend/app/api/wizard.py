@@ -4,9 +4,11 @@ import json
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.models.conversation import (
     ChatRequest,
@@ -20,7 +22,7 @@ from app.models.template import (
     GenerateRequest,
     MCPServerConfig,
 )
-from app.services.code_generator import generate_mcp_wrapper, generate_package
+from app.services.code_generator import generate_mcp_wrapper, generate_package, generate_sdk_package
 from app.services.nanda_client import nanda
 from app.services.orchestrator import process_message, process_message_stream
 from app.services.session_store import sessions
@@ -30,9 +32,12 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/wizard", tags=["wizard"])
 
+limiter = Limiter(key_func=get_remote_address)
+
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(body: ChatRequest):
+@limiter.limit("20/minute")
+async def chat(request: Request, body: ChatRequest):
     """Process a single turn of the wizard conversation.
 
     - If session_id is omitted, a new session is created.
@@ -45,7 +50,8 @@ async def chat(body: ChatRequest):
 
 
 @router.post("/chat/stream")
-async def chat_stream(body: ChatRequest):
+@limiter.limit("20/minute")
+async def chat_stream(request: Request, body: ChatRequest):
     """Streaming version of the chat endpoint.
 
     Returns a Server-Sent Events stream with events:
@@ -166,6 +172,14 @@ async def confirm_and_generate(session_id: str, body: Optional[ConfirmRequest] =
                 project_name=body.project_name,
                 deployment=rec.deployment,
             )
+        elif has_repo and repo_intent == "sdk":
+            # --- Repo-to-SDK package path ---
+            logger.info("Generating SDK package for repo: %s", session.requirements.repo_url)
+            package = generate_sdk_package(
+                repo_analysis=session.requirements.repo_analysis,
+                project_name=body.project_name,
+                deployment=rec.deployment,
+            )
         else:
             # --- Standard template-based generation ---
             # When the user shared a repo for integration, pass target app
@@ -234,7 +248,9 @@ def _build_tags(package: GeneratedPackage, session: WizardSession) -> list:
     if session.requirements.use_case:
         tags.append(session.requirements.use_case)
     if session.requirements.repo_url:
-        tags.append("repo-wrap" if session.requirements.repo_intent == "wrap" else "repo-integrate")
+        intent = session.requirements.repo_intent or "wrap"
+        tag_map = {"wrap": "repo-wrap", "sdk": "repo-sdk", "integrate": "repo-integrate"}
+        tags.append(tag_map.get(intent, f"repo-{intent}"))
     for a in (session.recommendation.agents or []) if session.recommendation else []:
         role = a.get("role") if isinstance(a, dict) else getattr(a, "role", None)
         if role:

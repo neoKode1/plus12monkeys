@@ -105,12 +105,12 @@ export default function LandingPage() {
 
             <div className="pt-12 reveal-text" style={{ animationDelay: "0.8s" }}>
               <Link
-                href={user ? "/wizard" : "/sign-in"}
+                href="/wizard"
                 className="group relative inline-flex flex-col items-center justify-center overflow-hidden px-8 py-4 transition-all hover:bg-zinc-900 border border-zinc-800"
               >
                 <span className="absolute inset-0 w-full h-full -mt-10 transition-all duration-700 transform opacity-0 group-hover:translate-y-0 group-hover:opacity-100 bg-zinc-900" />
                 <span className="relative text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-300 group-hover:text-white">
-                  {user ? "Launch Agent Wizard" : "Sign In to Launch →"}
+                  Launch Agent Wizard
                 </span>
               </Link>
               <p className="mt-4 text-[9px] uppercase tracking-widest text-zinc-800">
@@ -386,16 +386,25 @@ export default function LandingPage() {
             </h3>
             <div className="pt-4">
               <Link
-                href={user ? "/wizard" : "/sign-in"}
+                href="/wizard"
                 className="group relative inline-flex items-center justify-center overflow-hidden px-10 py-4 transition-all hover:bg-zinc-900 border border-zinc-800"
               >
                 <span className="relative text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-300 group-hover:text-white">
-                  {user ? "Launch Wizard →" : "Sign In to Launch →"}
+                  Launch Wizard →
                 </span>
               </Link>
             </div>
-            <p className="text-[9px] text-zinc-800 pt-12 uppercase tracking-widest">
-              +12 Monkeys © 2025. MIT License. All Rights Reserved.
+            <div className="flex items-center justify-center gap-4 pt-12">
+              <Link href="/terms" className="text-[9px] text-zinc-700 hover:text-zinc-500 uppercase tracking-widest font-mono">
+                Terms
+              </Link>
+              <span className="text-zinc-800">·</span>
+              <Link href="/privacy" className="text-[9px] text-zinc-700 hover:text-zinc-500 uppercase tracking-widest font-mono">
+                Privacy
+              </Link>
+            </div>
+            <p className="text-[9px] text-zinc-800 pt-4 uppercase tracking-widest">
+              +12 Monkeys © 2025. All Rights Reserved.
             </p>
           </div>
         </section>

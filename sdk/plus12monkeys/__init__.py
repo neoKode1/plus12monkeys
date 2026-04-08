@@ -3,9 +3,13 @@
 Usage:
     from plus12monkeys import Client
 
-    client = Client()  # uses https://plus12monkeys.com by default
+    client = Client(api_key="p12m_...")
     result = client.generate_mcp("https://github.com/microsoft/BitNet.git")
     result.write_to("./output")
+
+    # Or use env var: export PLUS12MONKEYS_API_KEY=p12m_...
+    import os
+    client = Client(api_key=os.environ["PLUS12MONKEYS_API_KEY"])
 """
 
 from plus12monkeys.client import Client

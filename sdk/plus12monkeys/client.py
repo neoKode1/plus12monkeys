@@ -43,9 +43,13 @@ class Client:
 
         Args:
             base_url: API base URL (default: https://plus12monkeys.com/api/v1).
-            api_key: Optional API key for authenticated access.
+            api_key: API key (required). Create one at https://plus12monkeys.com/settings/api-keys
             timeout: Request timeout in seconds.
         """
+        if not api_key:
+            raise Plus12MonkeysError(
+                "API key is required. Pass api_key='p12m_...' or set PLUS12MONKEYS_API_KEY env var."
+            )
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
@@ -98,9 +102,11 @@ class Client:
         url = f"{self.base_url}{path}"
         body = json.dumps(payload).encode("utf-8")
 
-        headers = {"Content-Type": "application/json", "User-Agent": "plus12monkeys-sdk/0.1.0"}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "plus12monkeys-sdk/0.1.0",
+            "X-API-Key": self.api_key,
+        }
 
         req = Request(url, data=body, headers=headers, method="POST")
         try:

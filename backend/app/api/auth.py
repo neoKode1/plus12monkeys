@@ -1,11 +1,14 @@
 """+12 Monkeys — Auth endpoints."""
 
 import re
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, Response, Request
+from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.core.auth_middleware import generate_api_key, hash_api_key, require_auth
 from app.models.auth import (
     SendKeyRequest,
     SendKeyResponse,
@@ -97,4 +100,75 @@ async def logout(response: Response):
     """Clear the session cookie."""
     response.delete_cookie(key=_COOKIE, path="/", samesite="lax", secure=True)
     return {"ok": True}
+
+
+# ── API Key Management ──
+
+
+class CreateApiKeyRequest(BaseModel):
+    name: str = "default"
+
+
+class ApiKeyResponse(BaseModel):
+    key: str
+    name: str
+    created_at: datetime
+
+
+@router.post("/api-keys", response_model=ApiKeyResponse)
+async def create_api_key(
+    body: CreateApiKeyRequest,
+    email: str = Depends(require_auth),
+):
+    """Create a new API key for the authenticated user.
+
+    The raw key is returned ONCE. Only the hash is stored.
+    """
+    from app.core.database import get_db
+
+    db = get_db()
+    raw_key = generate_api_key()
+    now = datetime.now(timezone.utc)
+    await db.api_keys.insert_one({
+        "key_hash": hash_api_key(raw_key),
+        "owner_email": email,
+        "name": body.name,
+        "created_at": now,
+        "last_used_at": None,
+        "use_count": 0,
+        "revoked": False,
+    })
+    return ApiKeyResponse(key=raw_key, name=body.name, created_at=now)
+
+
+@router.delete("/api-keys/{key_hash}")
+async def revoke_api_key(
+    key_hash: str,
+    email: str = Depends(require_auth),
+):
+    """Revoke an API key (soft delete)."""
+    from app.core.database import get_db
+
+    db = get_db()
+    result = await db.api_keys.update_one(
+        {"key_hash": key_hash, "owner_email": email, "revoked": False},
+        {"$set": {"revoked": True, "revoked_at": datetime.now(timezone.utc)}},
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="API key not found.")
+    return {"ok": True}
+
+
+@router.get("/api-keys")
+async def list_api_keys(email: str = Depends(require_auth)):
+    """List all API keys for the authenticated user (hashes only, not raw keys)."""
+    from app.core.database import get_db
+
+    db = get_db()
+    cursor = db.api_keys.find(
+        {"owner_email": email, "revoked": False},
+        {"_id": 0, "key_hash": 1, "name": 1, "created_at": 1, "last_used_at": 1, "use_count": 1},
+    )
+    keys = await cursor.to_list(length=50)
+    return {"keys": keys}
 

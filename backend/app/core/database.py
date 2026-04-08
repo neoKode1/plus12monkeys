@@ -32,6 +32,9 @@ async def ensure_indexes() -> None:
         await db.magic_tokens.create_index("expires_at", expireAfterSeconds=0)
         # Idempotency index for processed Stripe events
         await db.stripe_events.create_index("session_id", unique=True)
+        # API key lookup by hash
+        await db.api_keys.create_index("key_hash", unique=True)
+        await db.api_keys.create_index("owner_email")
         logger.info("MongoDB indexes ensured")
     except Exception as exc:
         logger.warning("Failed to create indexes: %s", exc)

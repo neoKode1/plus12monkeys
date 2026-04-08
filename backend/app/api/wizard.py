@@ -23,7 +23,7 @@ from app.models.template import (
     MCPServerConfig,
 )
 from app.services.code_generator import generate_mcp_wrapper, generate_package, generate_sdk_package
-from app.services.nanda_client import nanda
+from app.core.database import get_db
 from app.services.orchestrator import process_message, process_message_stream
 from app.services.session_store import sessions
 from app.services.template_registry import get_template_for_framework
@@ -231,7 +231,8 @@ async def confirm_and_generate(session_id: str, body: Optional[ConfirmRequest] =
             "tags": _build_tags(package, session),
             "created_at": package.created_at.isoformat(),
         }
-        await nanda.log_build(build_data)
+        db = get_db()
+        await db.builds.replace_one({"build_id": build_data["build_id"]}, build_data, upsert=True)
         logger.info("Build archived: %s (session %s)", package.project_name, session_id)
     except Exception as exc:
         # Non-fatal — don't fail the user's download if archiving fails

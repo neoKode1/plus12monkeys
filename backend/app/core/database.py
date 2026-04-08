@@ -35,6 +35,9 @@ async def ensure_indexes() -> None:
         # API key lookup by hash
         await db.api_keys.create_index("key_hash", unique=True)
         await db.api_keys.create_index("owner_email")
+        # Builds archive
+        await db.builds.create_index("build_id", unique=True)
+        await db.builds.create_index([("created_at", -1)])
         logger.info("MongoDB indexes ensured")
     except Exception as exc:
         logger.warning("Failed to create indexes: %s", exc)

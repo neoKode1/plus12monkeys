@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     session_ttl_minutes: int = 1440  # 24 hours
     session_max_count: int = 500     # evict oldest when exceeded
 
+    # Redis (optional — sessions persist across deploys when set)
+    redis_url: str = ""  # e.g. redis://default:password@host:port
+
     # MongoDB
     mongodb_url: str = ""
     mongodb_db: str = "twelve_monkeys"

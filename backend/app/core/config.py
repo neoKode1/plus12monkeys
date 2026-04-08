@@ -1,6 +1,11 @@
 """Application configuration via environment variables."""
 
+import logging
+import secrets
+
 from pydantic_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -18,8 +23,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     llm_model: str = "claude-sonnet-4-20250514"
 
-    # CORS — comma-separated origins; "*" allows all (dev only)
-    cors_origins: str = "*"
+    # CORS — comma-separated origins (locked to production + local dev)
+    cors_origins: str = "https://plus12monkeys.com,http://localhost:3000"
 
     # Sessions
     session_ttl_minutes: int = 1440  # 24 hours
@@ -31,7 +36,7 @@ class Settings(BaseSettings):
 
     # Auth
     resend_api_key: str = ""
-    jwt_secret: str = "change-me-in-production"
+    jwt_secret: str = ""  # REQUIRED — set JWT_SECRET env var (use: openssl rand -hex 32)
     jwt_algorithm: str = "HS256"
     jwt_expire_hours: int = 72  # 3 days
     magic_link_expire_minutes: int = 15
@@ -56,4 +61,15 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Guard: JWT secret must be set in production
+if not settings.jwt_secret:
+    if settings.debug:
+        settings.jwt_secret = secrets.token_hex(32)
+        logger.warning("JWT_SECRET not set — generated ephemeral secret (debug mode)")
+    else:
+        raise RuntimeError(
+            "JWT_SECRET env var is required in production. "
+            "Generate one with: openssl rand -hex 32"
+        )
 

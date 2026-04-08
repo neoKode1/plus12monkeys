@@ -10,8 +10,10 @@ from dataclasses import asdict
 from enum import Enum
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+
+from app.core.auth_middleware import require_api_key
 
 from app.models.conversation import DeploymentTarget
 from app.models.template import GeneratedPackage
@@ -50,14 +52,17 @@ class GenerateDirectResponse(BaseModel):
 # ---------- Endpoint ----------
 
 @router.post("", response_model=GenerateDirectResponse)
-async def generate_direct(body: GenerateDirectRequest):
+async def generate_direct(
+    body: GenerateDirectRequest,
+    owner_email: str = Depends(require_api_key),
+):
     """Analyze a repo and generate an MCP server or SDK package in one call.
 
     This is the programmatic API used by the +12 Monkeys SDK.
-    No conversation session required.
+    Requires a valid X-API-Key header.
     """
     # 1. Analyze the repo
-    logger.info("Direct generate: %s → %s", body.repo_url, body.output_type.value)
+    logger.info("Direct generate: %s → %s (by %s)", body.repo_url, body.output_type.value, owner_email)
     try:
         analysis = await analyze_repo(body.repo_url)
     except Exception as exc:
